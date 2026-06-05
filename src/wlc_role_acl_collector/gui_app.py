@@ -279,7 +279,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
     def _browse_role_networks(self) -> None:
         selected = filedialog.askopenfilename(
             title="Select Role network Excel",
-            filetypes=(("Excel files", "*.xlsx *.xlsm"), ("All files", "*.*")),
+            filetypes=(("Excel workbooks", "*.xlsx *.xlsm"),),
         )
         if selected:
             self.role_networks_path_var.set(selected)

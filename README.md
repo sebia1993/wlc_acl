@@ -37,6 +37,8 @@ GUI 입력 항목:
 - Role network Excel: 선택 사항입니다. `Role 이름`, `네트워크 대역`, `서브넷마스크` 컬럼을 가진 Excel 파일을 넣으면 HTML/Excel 보고서에 로컬 기준 Role 대역과 WLC 추정값 비교 결과가 표시됩니다.
 - Timeout seconds
 
+Role network Excel은 실제 Excel 통합 문서 형식(`.xlsx` 또는 `.xlsm`)이어야 합니다. CSV, HTML, 구형 `.xls` 파일의 확장자만 `.xlsx`로 바꾸면 열 수 없습니다. 제공된 `config\role_networks.example.xlsx`를 열어 값만 수정한 뒤 `다른 이름으로 저장 > Excel 통합 문서 (*.xlsx)`로 저장해서 사용하세요.
+
 `수집 시작`을 누르면 WLC 접속부터 명령 수집, 보고서 생성까지 순서대로 진행합니다. 접속에 실패하면 Run Log와 오류창에 원인이 표시됩니다.
 
 수집 중에는 Run Log에 현재 실행 중인 명령, Role 진행 번호, 실패 명령이 표시됩니다. 창을 줄여도 입력 영역은 스크롤되고 하단 실행/결과 버튼은 계속 보입니다.

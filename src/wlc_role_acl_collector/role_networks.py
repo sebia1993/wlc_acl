@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ipaddress
 import re
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,12 @@ from .models import RoleNetworkDefinition
 
 class RoleNetworkDefinitionError(ValueError):
     pass
+
+
+_EXCEL_FORMAT_HINT = (
+    "Use config\\role_networks.example.xlsx as the template, edit only the rows, "
+    "then save it as Excel Workbook (*.xlsx). Do not rename a CSV, HTML, or .xls file to .xlsx."
+)
 
 
 _HEADER_ALIASES = {
@@ -53,15 +60,16 @@ def load_role_network_definitions(path: Path | str | None) -> list[RoleNetworkDe
         return []
 
     source = Path(path)
-    if not source.exists():
-        raise RoleNetworkDefinitionError(f"Role network Excel file was not found: {source}")
-    if source.suffix.lower() not in {".xlsx", ".xlsm"}:
-        raise RoleNetworkDefinitionError("Role network file must be an .xlsx or .xlsm file.")
+    _validate_excel_file(source)
 
     try:
         workbook = load_workbook(source, read_only=True, data_only=True)
+    except zipfile.BadZipFile as exc:
+        raise RoleNetworkDefinitionError(_not_real_xlsx_message(source)) from exc
     except Exception as exc:
-        raise RoleNetworkDefinitionError(f"Unable to open Role network Excel file: {exc}") from exc
+        raise RoleNetworkDefinitionError(
+            f"Unable to open Role network Excel file: {exc}. {_EXCEL_FORMAT_HINT}"
+        ) from exc
 
     try:
         worksheet = workbook.worksheets[0]
@@ -119,6 +127,36 @@ def load_role_network_definitions(path: Path | str | None) -> list[RoleNetworkDe
     if not definitions:
         raise RoleNetworkDefinitionError("Role network Excel file does not contain any mapping rows.")
     return definitions
+
+
+def _validate_excel_file(source: Path) -> None:
+    if not source.exists():
+        raise RoleNetworkDefinitionError(f"Role network Excel file was not found: {source}")
+    if source.name.startswith("~$"):
+        raise RoleNetworkDefinitionError(
+            "The selected file looks like an Excel temporary lock file. "
+            "Close Excel or select the real workbook file that does not start with '~$'."
+        )
+
+    suffix = source.suffix.lower()
+    if suffix == ".xls":
+        raise RoleNetworkDefinitionError(
+            "The selected file is an old .xls workbook. "
+            "Open it in Excel and save it as Excel Workbook (*.xlsx), then select the new file."
+        )
+    if suffix not in {".xlsx", ".xlsm"}:
+        raise RoleNetworkDefinitionError(
+            f"Role network file must be an .xlsx or .xlsm file. {_EXCEL_FORMAT_HINT}"
+        )
+    if not zipfile.is_zipfile(source):
+        raise RoleNetworkDefinitionError(_not_real_xlsx_message(source))
+
+
+def _not_real_xlsx_message(source: Path) -> str:
+    return (
+        f"The selected file is not a valid Excel xlsx/xlsm workbook: {source}. "
+        f"{_EXCEL_FORMAT_HINT}"
+    )
 
 
 def _find_header_row(rows: list[tuple[Any, ...]]) -> int | None:

@@ -49,6 +49,40 @@ def test_load_role_network_definitions_rejects_invalid_rows(tmp_path):
     assert "CIDR prefix and subnet mask do not match" in message
 
 
+def test_load_role_network_definitions_rejects_renamed_text_file(tmp_path):
+    path = tmp_path / "role_networks.xlsx"
+    path.write_text("role,network,subnet_mask\ncorp,10.10.10.0,255.255.255.0\n", encoding="utf-8")
+
+    with pytest.raises(RoleNetworkDefinitionError) as exc_info:
+        load_role_network_definitions(path)
+
+    message = str(exc_info.value)
+    assert "not a valid Excel xlsx/xlsm workbook" in message
+    assert "Do not rename a CSV, HTML, or .xls file to .xlsx" in message
+
+
+def test_load_role_network_definitions_rejects_excel_lock_file(tmp_path):
+    path = tmp_path / "~$role_networks.xlsx"
+    path.write_bytes(b"")
+
+    with pytest.raises(RoleNetworkDefinitionError) as exc_info:
+        load_role_network_definitions(path)
+
+    assert "temporary lock file" in str(exc_info.value)
+
+
+def test_load_role_network_definitions_rejects_old_xls_file(tmp_path):
+    path = tmp_path / "role_networks.xls"
+    path.write_bytes(b"old excel bytes")
+
+    with pytest.raises(RoleNetworkDefinitionError) as exc_info:
+        load_role_network_definitions(path)
+
+    message = str(exc_info.value)
+    assert "old .xls workbook" in message
+    assert "save it as Excel Workbook (*.xlsx)" in message
+
+
 def _write_workbook(path: Path, rows: list[list[str]]) -> None:
     workbook = Workbook()
     worksheet = workbook.active

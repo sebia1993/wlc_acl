@@ -112,6 +112,15 @@ def test_write_excel_and_html_report(tmp_path):
     assert "beforeprint" in html
     assert "@media print" in html
     assert 'class="report-actions no-print"' in html
+    assert 'id="toggle-raw"' in html
+    assert 'aria-pressed="false">Raw 보기</button>' in html
+    assert "Raw 숨김" in html
+    assert '<th class="raw-column">Raw</th>' in html
+    assert 'class="raw raw-column"' in html
+    assert ".raw-column { display: none; }" in html
+    assert "body.raw-visible .raw-column { display: table-cell; }" in html
+    assert "document.body.classList.toggle('raw-visible')" in html
+    assert "syncRawToggleButton" in html
     assert 'colspan="8"' in html
     assert "alias-type-host" in html
     assert "alias-type-network" in html

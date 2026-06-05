@@ -342,7 +342,7 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
           </div>
           {_role_network_context_html(role_network_lookup.get(str(item['role']), []))}
           <table>
-            <thead><tr><th>ACL</th><th>#</th><th>Action</th><th>Source</th><th>Destination</th><th>Service</th><th>Raw</th><th>Comment</th></tr></thead>
+            <thead><tr><th>ACL</th><th>#</th><th>Action</th><th>Source</th><th>Destination</th><th>Service</th><th class="raw-column">Raw</th><th>Comment</th></tr></thead>
             <tbody>
               {_acl_rows_html(str(item['role']), item['rows'], alias_lookup)}
             </tbody>
@@ -473,6 +473,8 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
     table {{ width: 100%; border-collapse: collapse; background: var(--panel); }}
     th, td {{ border-bottom: 1px solid var(--line); padding: 9px 10px; text-align: left; vertical-align: top; font-size: 13px; }}
     th {{ background: #1f4e78; color: #fff; position: sticky; top: 0; }}
+    .raw-column {{ display: none; }}
+    body.raw-visible .raw-column {{ display: table-cell; }}
     .alias-prefix {{
       color: var(--muted);
       margin-right: 4px;
@@ -600,6 +602,7 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
     <div class="report-actions no-print">
       <button id="save-commented-html" class="report-action" type="button">주석 포함 HTML 저장</button>
       <button id="print-pdf" class="report-action secondary" type="button">PDF 저장/인쇄</button>
+      <button id="toggle-raw" class="report-action secondary" type="button" aria-pressed="false">Raw 보기</button>
     </div>
     <h2>Role ACL Detail</h2>
     <div class="role-tabs no-print" role="tablist" aria-label="Role ACL list">
@@ -611,7 +614,25 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
   <script>
     const roleTabs = Array.from(document.querySelectorAll('.role-tab'));
     const rolePanels = Array.from(document.querySelectorAll('.role-panel'));
+    const rawToggleButton = document.querySelector('#toggle-raw');
     let selectedRolePanelId = roleTabs.find((button) => button.getAttribute('aria-selected') === 'true')?.dataset.panelId || roleTabs[0]?.dataset.panelId || '';
+
+    function syncRawToggleButton() {{
+      if (!rawToggleButton) {{
+        return;
+      }}
+      const rawVisible = document.body.classList.contains('raw-visible');
+      rawToggleButton.textContent = rawVisible ? 'Raw 숨김' : 'Raw 보기';
+      rawToggleButton.setAttribute('aria-pressed', String(rawVisible));
+    }}
+
+    if (rawToggleButton) {{
+      rawToggleButton.addEventListener('click', () => {{
+        document.body.classList.toggle('raw-visible');
+        syncRawToggleButton();
+      }});
+      syncRawToggleButton();
+    }}
 
     function selectRolePanel(panelId) {{
       selectedRolePanelId = panelId || selectedRolePanelId;
@@ -818,7 +839,7 @@ def _acl_rows_html(
               <td>{_acl_field_html(str(row.get('source', '')), detail_id, str(row.get('source_interpretation', '')))}</td>
               <td>{_acl_field_html(str(row.get('destination', '')), detail_id, str(row.get('destination_interpretation', '')))}</td>
               <td>{escape(str(row.get('service', '')))}</td>
-              <td class="raw">{escape(str(row.get('raw_rule', '')))}</td>
+              <td class="raw raw-column">{escape(str(row.get('raw_rule', '')))}</td>
               <td class="comment-cell">
                 <textarea class="comment-input" data-comment-id="{escape(comment_id)}" aria-label="ACL comment"></textarea>
                 <div id="{escape(comment_id)}-status" class="comment-status">입력 시 자동 저장</div>

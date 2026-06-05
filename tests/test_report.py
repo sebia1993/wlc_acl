@@ -56,8 +56,17 @@ def test_write_excel_and_html_report(tmp_path):
     assert "configured_subnet" in context_headers
     assert "observed_networks" in context_headers
     html = files["html"].read_text(encoding="utf-8")
-    assert "CORP" in html
+    assert "corp-employee" in html
     assert "<th>Zone</th>" not in html
+    assert 'id="filter"' not in html
+    assert 'id="ssid-table"' not in html
+    assert 'class="toolbar no-print"' not in html
+    assert "<th>SSID</th>" not in html
+    assert "<th>AP Group</th>" not in html
+    assert "<th>AAA Profile</th>" not in html
+    assert "<th>Role Type</th>" not in html
+    assert "<th>VAP VLAN</th>" not in html
+    assert "<th>Effective VLAN</th>" not in html
     assert "Role User Network" in html
     assert "Confidence" in html
     assert "Configured Subnet" in html
@@ -87,7 +96,7 @@ def test_write_excel_and_html_report(tmp_path):
     assert "window.print()" in html
     assert "beforeprint" in html
     assert "@media print" in html
-    assert 'class="toolbar no-print"' in html
+    assert 'class="report-actions no-print"' in html
     assert 'colspan="8"' in html
     assert "alias-type-host" in html
     assert "alias-type-network" in html

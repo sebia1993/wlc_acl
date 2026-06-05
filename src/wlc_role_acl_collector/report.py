@@ -285,7 +285,6 @@ def _write_excel(path: Path, frames: dict[str, pd.DataFrame]) -> None:
 
 def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
     overview = frames["Overview"].to_dict(orient="records")
-    ssid_rows = frames["SSID_Role_Map"].to_dict(orient="records")
     role_network_rows = frames["Role_Network_Context"].to_dict(orient="records")
     acl_rows = frames["Role_ACL_Detail"].to_dict(orient="records")
     alias_rows = frames["Alias_Detail"].to_dict(orient="records")
@@ -302,30 +301,6 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
         </section>
         """
         for row in overview
-    )
-
-    ssid_table = "\n".join(
-        f"""
-        <tr data-role="{escape(str(row.get('role', '')))}" data-ssid="{escape(str(row.get('ssid', '')))}">
-          <td>{escape(str(row.get('controller', '')))}</td>
-          <td>{escape(str(row.get('ssid', '')))}</td>
-          <td>{escape(str(row.get('ap_group', '')))}</td>
-          <td>{escape(str(row.get('aaa_profile', '')))}</td>
-          <td>{escape(str(row.get('role_type', '')))}</td>
-          <td><button class="role-link" type="button" data-target="{escape(str(row.get('role', '')))}">{escape(str(row.get('role', '')))}</button></td>
-          <td>{escape(str(row.get('vlan', '')))}</td>
-          <td>{escape(str(row.get('effective_vlan', '')))}</td>
-          <td>{escape(str(row.get('network_confidence', '')))}</td>
-          <td>{escape(str(row.get('assignment_source', '')))}</td>
-          <td>{escape(str(row.get('configured_subnet', '')))}</td>
-          <td>{escape(str(row.get('role_user_network', '')))}</td>
-          <td>{escape(str(row.get('network_evidence', '')))}</td>
-          <td>{escape(str(row.get('observed_user_count', '')))}</td>
-          <td>{escape(str(row.get('access_summary', '')))}</td>
-          <td>{'Y' if row.get('dynamic_role_possible') else ''}</td>
-        </tr>
-        """
-        for row in ssid_rows
     )
 
     acl_by_role: dict[str, list[dict[str, Any]]] = {}
@@ -422,18 +397,11 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
     .confidence-dynamic-possible {{ background: #fff7ed; border-color: #fdba74; color: #9a3412; }}
     .confidence-observed {{ background: #f5f3ff; border-color: #c4b5fd; color: #5b21b6; }}
     .confidence-unknown {{ background: #f2f4f7; border-color: #d0d5dd; color: #475467; }}
-    .toolbar {{ display: flex; gap: 10px; align-items: center; margin: 18px 0 10px; }}
-    input {{
-      width: min(520px, 100%);
-      padding: 10px 12px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      font-size: 14px;
-    }}
     .report-actions {{
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
+      margin: 18px 0 10px;
     }}
     .report-action {{
       background: #0f6cbd;
@@ -448,16 +416,6 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
     table {{ width: 100%; border-collapse: collapse; background: var(--panel); }}
     th, td {{ border-bottom: 1px solid var(--line); padding: 9px 10px; text-align: left; vertical-align: top; font-size: 13px; }}
     th {{ background: #1f4e78; color: #fff; position: sticky; top: 0; }}
-    .table-wrap {{ max-height: 520px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }}
-    .role-link {{
-      border: 0;
-      border-bottom: 1px solid var(--accent);
-      background: transparent;
-      color: var(--accent);
-      cursor: pointer;
-      padding: 0;
-      font: inherit;
-    }}
     .alias-prefix {{
       color: var(--muted);
       margin-right: 4px;
@@ -550,10 +508,9 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
       body {{ background: #ffffff; }}
       header, main {{ padding: 14px 18px; }}
       .no-print {{ display: none !important; }}
-      .table-wrap {{ max-height: none; overflow: visible; border: 0; }}
       .acl-section {{ break-inside: auto; }}
       th {{ position: static; }}
-      .role-link, .alias-link {{
+      .alias-link {{
         background: transparent;
         border: 0;
         color: inherit;
@@ -576,44 +533,15 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
   </header>
   <main>
     <div class="metrics">{cards}</div>
-    <div class="toolbar no-print">
-      <input id="filter" type="search" placeholder="SSID, Role, Controller 검색">
-      <div class="report-actions">
-        <button id="save-commented-html" class="report-action" type="button">주석 포함 HTML 저장</button>
-        <button id="print-pdf" class="report-action secondary" type="button">PDF 저장/인쇄</button>
-      </div>
-    </div>
-    <div class="table-wrap">
-      <table id="ssid-table">
-        <thead>
-          <tr><th>Controller</th><th>SSID</th><th>AP Group</th><th>AAA Profile</th><th>Role Type</th><th>Role</th><th>VAP VLAN</th><th>Effective VLAN</th><th>Confidence</th><th>Assignment</th><th>Configured Subnet</th><th>Role User Network</th><th>Evidence</th><th>Observed Users</th><th>Access</th><th>Dynamic</th></tr>
-        </thead>
-        <tbody>{ssid_table}</tbody>
-      </table>
+    <div class="report-actions no-print">
+      <button id="save-commented-html" class="report-action" type="button">주석 포함 HTML 저장</button>
+      <button id="print-pdf" class="report-action secondary" type="button">PDF 저장/인쇄</button>
     </div>
     <h2>Role ACL Detail</h2>
     {acl_sections}
   </main>
   <textarea id="acl-comments-data" hidden>{{}}</textarea>
   <script>
-    const filter = document.querySelector('#filter');
-    const rows = Array.from(document.querySelectorAll('#ssid-table tbody tr'));
-    filter.addEventListener('input', () => {{
-      const q = filter.value.toLowerCase();
-      for (const row of rows) {{
-        row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
-      }}
-    }});
-    for (const button of document.querySelectorAll('.role-link')) {{
-      button.addEventListener('click', () => {{
-        const role = button.dataset.target;
-        const section = document.querySelector(`.acl-section[data-role="${{CSS.escape(role)}}"]`);
-        if (section) {{
-          section.open = true;
-          section.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
-        }}
-      }});
-    }}
     for (const button of document.querySelectorAll('.alias-link')) {{
       button.addEventListener('click', () => {{
         const detailId = button.dataset.detailId;
@@ -868,7 +796,7 @@ def _role_network_context_html(rows: list[dict[str, Any]]) -> str:
         rendered_rows.append(
             f"""
             <div class="network-context-row">
-              <span class="network-chip network-confidence {_confidence_class(confidence)}">{escape(confidence)}</span>
+              <span class="network-chip network-confidence {_confidence_class(confidence)}"><b>Confidence</b> {escape(confidence)}</span>
               <span class="network-chip"><b>VLAN</b> {escape(str(row.get('configured_vlan', '') or row.get('effective_vlan', '') or 'Unknown'))}</span>
               <span class="network-chip"><b>Configured Subnet</b> {escape(str(row.get('configured_subnet', '') or row.get('role_user_network', '') or 'Unknown'))}</span>
               <span class="network-chip"><b>Assignment</b> {escape(str(row.get('assignment_source', '') or 'Unknown'))}</span>

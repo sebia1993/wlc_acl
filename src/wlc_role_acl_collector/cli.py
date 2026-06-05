@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 from .collector import collect_from_controller, collect_from_offline_raw
@@ -8,6 +9,7 @@ from .config import load_controllers
 from .interactive import prompt_controller_targets
 from .models import ControllerTarget
 from .report import build_parsed_controllers, timestamp_slug, write_raw_result, write_reports
+from .role_networks import RoleNetworkDefinitionError, load_role_network_definitions
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -22,6 +24,12 @@ def main(argv: list[str] | None = None) -> int:
     collect_parser.add_argument("--output-dir", default=Path("outputs"), type=Path, help="report output root")
     collect_parser.add_argument("--timeout", default=60, type=int, help="per-command timeout seconds")
     collect_parser.add_argument(
+        "--role-networks",
+        type=Path,
+        default=None,
+        help="optional local Role network mapping Excel file",
+    )
+    collect_parser.add_argument(
         "--offline-raw-dir",
         type=Path,
         default=None,
@@ -35,6 +43,12 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _collect(args: argparse.Namespace) -> int:
+    try:
+        local_role_networks = load_role_network_definitions(args.role_networks) if args.role_networks else []
+    except RoleNetworkDefinitionError as exc:
+        print(f"Role network Excel error: {exc}", file=sys.stderr)
+        return 2
+
     targets = _resolve_targets(args)
     run_dir = args.output_dir / timestamp_slug()
     raw_dir = run_dir / "raw"
@@ -54,7 +68,12 @@ def _collect(args: argparse.Namespace) -> int:
         results.append(result)
 
     parsed = build_parsed_controllers(results)
-    files = write_reports(parsed_controllers=parsed, collection_results=results, output_dir=run_dir)
+    files = write_reports(
+        parsed_controllers=parsed,
+        collection_results=results,
+        output_dir=run_dir,
+        local_role_networks=local_role_networks,
+    )
     print(f"Output directory: {run_dir}")
     print(f"Excel: {files['xlsx']}")
     print(f"HTML: {files['html']}")

@@ -142,6 +142,15 @@ class RoleNetworkContext:
     notes: str = ""
 
 
+@dataclass(frozen=True)
+class RoleNetworkDefinition:
+    role: str
+    network: str
+    subnet_mask: str
+    source_file: str = ""
+    source_row: int = 0
+
+
 @dataclass
 class SsidRoleMapping:
     controller: str

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from openpyxl import Workbook, load_workbook
+
 import wlc_role_acl_collector.cli as cli
 from wlc_role_acl_collector.cli import main
 from wlc_role_acl_collector.interactive import prompt_controller_targets
@@ -14,6 +16,8 @@ def test_cli_collect_offline(tmp_path):
         encoding="utf-8",
     )
     fixture_root = Path(__file__).parent / "fixtures"
+    role_networks = tmp_path / "role_networks.xlsx"
+    _write_role_networks(role_networks)
 
     exit_code = main(
         [
@@ -24,12 +28,16 @@ def test_cli_collect_offline(tmp_path):
             str(fixture_root),
             "--output-dir",
             str(tmp_path / "outputs"),
+            "--role-networks",
+            str(role_networks),
         ]
     )
 
     assert exit_code == 0
     reports = list((tmp_path / "outputs").glob("*/ssid_role_acl_report.xlsx"))
     assert len(reports) == 1
+    workbook = load_workbook(reports[0], read_only=True)
+    assert "Local_Role_Networks" in workbook.sheetnames
 
 
 def test_cli_interactive_defaults_to_ssh(monkeypatch, tmp_path):
@@ -70,3 +78,11 @@ def test_cli_interactive_defaults_to_ssh(monkeypatch, tmp_path):
     assert captured["controller"].port == 22
     assert captured["controller"].device_type == "aruba_os"
     assert captured["credentials"].username == "admin"
+
+
+def _write_role_networks(path: Path) -> None:
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.append(["role", "network", "subnet_mask"])
+    worksheet.append(["guest-logon", "10.30.0.0", "255.255.255.0"])
+    workbook.save(path)

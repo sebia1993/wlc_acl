@@ -34,6 +34,7 @@ GUI 입력 항목:
 - Username
 - Password, Enable password
 - Output 폴더
+- Role network Excel: 선택 사항입니다. `Role 이름`, `네트워크 대역`, `서브넷마스크` 컬럼을 가진 Excel 파일을 넣으면 HTML/Excel 보고서에 로컬 기준 Role 대역과 WLC 추정값 비교 결과가 표시됩니다.
 - Timeout seconds
 
 `수집 시작`을 누르면 WLC 접속부터 명령 수집, 보고서 생성까지 순서대로 진행합니다. 접속에 실패하면 Run Log와 오류창에 원인이 표시됩니다.
@@ -75,12 +76,20 @@ cd "D:\Codex Project\Network\wlc_role_acl_collector"
 - `dist\WlcRoleAclCollectorGUI.exe`
 - `dist\WlcRoleAclCollectorGUI_v0.1.0.zip`
 
+ZIP 배포본에는 `config\role_networks.example.xlsx` 샘플 템플릿이 함께 포함됩니다.
+
 ## CLI 실행
 
 GUI가 기본 사용 방식이지만 CLI도 사용할 수 있습니다.
 
 ```powershell
 python -m wlc_role_acl_collector collect
+```
+
+로컬 Role 대역 Excel을 함께 사용할 때:
+
+```powershell
+python -m wlc_role_acl_collector collect --role-networks config\role_networks.example.xlsx
 ```
 
 입력 예시:

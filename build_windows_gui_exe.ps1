@@ -14,11 +14,14 @@ $distDir = Join-Path $PSScriptRoot "dist"
 $buildRoot = Join-Path $PSScriptRoot ".pyinstaller_build"
 $buildDir = Join-Path $buildRoot ([DateTime]::Now.ToString("yyyyMMdd_HHmmss"))
 $specDir = Join-Path $buildDir "spec"
+$releaseRoot = Join-Path $buildDir "release"
 $distExe = Join-Path $distDir "$exeName.exe"
 $releaseZip = Join-Path $distDir "${exeName}_v${version}.zip"
+$roleNetworkTemplate = Join-Path $PSScriptRoot "config\role_networks.example.xlsx"
 
 New-Item -ItemType Directory -Force -Path $distDir | Out-Null
 New-Item -ItemType Directory -Force -Path $specDir | Out-Null
+New-Item -ItemType Directory -Force -Path $releaseRoot | Out-Null
 
 if (Test-Path $distExe) {
     Remove-Item -LiteralPath $distExe -Force
@@ -45,7 +48,10 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Creating release zip..."
-Compress-Archive -LiteralPath $distExe -DestinationPath $releaseZip -Force
+Copy-Item -LiteralPath $distExe -Destination $releaseRoot -Force
+New-Item -ItemType Directory -Force -Path (Join-Path $releaseRoot "config") | Out-Null
+Copy-Item -LiteralPath $roleNetworkTemplate -Destination (Join-Path $releaseRoot "config") -Force
+Compress-Archive -Path (Join-Path $releaseRoot "*") -DestinationPath $releaseZip -Force
 
 Write-Host ""
 Write-Host "Build completed."

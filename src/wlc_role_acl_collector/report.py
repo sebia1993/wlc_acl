@@ -10,7 +10,7 @@ from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from .aos8_parser import parse_controller_config
-from .models import CollectionResult, ParsedController
+from .models import CollectionResult, ParsedController, RoleNetworkDefinition
 
 
 def timestamp_slug() -> str:
@@ -83,28 +83,39 @@ def write_reports(
     parsed_controllers: list[ParsedController],
     collection_results: list[CollectionResult],
     output_dir: Path,
+    local_role_networks: list[RoleNetworkDefinition] | None = None,
 ) -> dict[str, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     workbook_path = output_dir / "ssid_role_acl_report.xlsx"
     html_path = output_dir / "ssid_role_acl_report.html"
 
-    frames = _build_frames(parsed_controllers, collection_results)
+    local_role_networks = local_role_networks or []
+    frames = _build_frames(parsed_controllers, collection_results, local_role_networks)
     _write_excel(workbook_path, frames)
-    _write_html(html_path, frames)
+    _write_html(html_path, frames, local_role_networks_enabled=bool(local_role_networks))
     return {"xlsx": workbook_path, "html": html_path}
 
 
 def _build_frames(
     parsed_controllers: list[ParsedController],
     collection_results: list[CollectionResult],
+    local_role_networks: list[RoleNetworkDefinition] | None = None,
 ) -> dict[str, pd.DataFrame]:
+    local_role_networks = local_role_networks or []
+    local_lookup = _group_local_role_networks(local_role_networks)
+    local_mapping_enabled = bool(local_role_networks)
     ssid_rows: list[dict[str, Any]] = []
     role_network_rows: list[dict[str, Any]] = []
+    local_network_rows: list[dict[str, Any]] = []
     acl_rows: list[dict[str, Any]] = []
     alias_rows: list[dict[str, Any]] = []
     unresolved_rows: list[dict[str, Any]] = []
 
     for parsed in parsed_controllers:
+        local_status_by_role = _local_network_status_by_role(parsed, local_lookup, local_mapping_enabled)
+        local_network_rows.extend(
+            _local_network_rows(parsed, local_lookup, local_status_by_role, local_mapping_enabled)
+        )
         for context in parsed.role_network_contexts:
             role_network_rows.append(
                 {
@@ -126,6 +137,7 @@ def _build_frames(
                 }
             )
         for mapping in parsed.ssid_role_mappings:
+            local_status = local_status_by_role.get(mapping.role, _empty_local_network_status())
             ssid_rows.append(
                 {
                     "controller": mapping.controller,
@@ -144,6 +156,9 @@ def _build_frames(
                     "assignment_source": mapping.assignment_source,
                     "configured_vlan": mapping.configured_vlan,
                     "configured_subnet": mapping.configured_subnet,
+                    "local_role_networks": local_status["networks"],
+                    "local_network_status": local_status["status"],
+                    "local_network_notes": local_status["notes"],
                     "observed_user_count": mapping.observed_user_count,
                     "forward_mode": mapping.forward_mode,
                     "access_summary": mapping.access_summary,
@@ -152,6 +167,7 @@ def _build_frames(
                 }
             )
         for policy in parsed.role_policies.values():
+            local_status = local_status_by_role.get(policy.role, _empty_local_network_status())
             if not policy.rules:
                 acl_rows.append(
                     {
@@ -166,6 +182,9 @@ def _build_frames(
                         "destination_interpretation": "",
                         "service": "",
                         "role_user_network": _role_network_summary(parsed, policy.role),
+                        "local_role_networks": local_status["networks"],
+                        "local_network_status": local_status["status"],
+                        "local_network_notes": local_status["notes"],
                         "access_summary": policy.access_summary,
                         "access_flags": ", ".join(policy.access_flags),
                         "raw_rule": "",
@@ -181,10 +200,21 @@ def _build_frames(
                         "action": rule.action,
                         "source": rule.source,
                         "destination": rule.destination,
-                        "source_interpretation": _acl_field_interpretation(rule.source),
-                        "destination_interpretation": _acl_field_interpretation(rule.destination),
+                        "source_interpretation": _acl_field_interpretation(
+                            rule.source,
+                            local_networks=local_status["networks"],
+                            local_mapping_enabled=local_mapping_enabled,
+                        ),
+                        "destination_interpretation": _acl_field_interpretation(
+                            rule.destination,
+                            local_networks=local_status["networks"],
+                            local_mapping_enabled=local_mapping_enabled,
+                        ),
                         "service": rule.service,
                         "role_user_network": _role_network_summary(parsed, policy.role),
+                        "local_role_networks": local_status["networks"],
+                        "local_network_status": local_status["status"],
+                        "local_network_notes": local_status["notes"],
                         "access_summary": policy.access_summary,
                         "access_flags": ", ".join(policy.access_flags),
                         "raw_rule": rule.raw,
@@ -239,11 +269,149 @@ def _build_frames(
         "Overview": pd.DataFrame(overview_rows),
         "SSID_Role_Map": pd.DataFrame(ssid_rows),
         "Role_Network_Context": pd.DataFrame(role_network_rows),
+        "Local_Role_Networks": pd.DataFrame(
+            local_network_rows,
+            columns=[
+                "controller",
+                "role",
+                "local_role_network",
+                "subnet_mask",
+                "source_file",
+                "source_row",
+                "status",
+                "notes",
+                "wlc_configured_subnets",
+            ],
+        ),
         "Role_ACL_Detail": pd.DataFrame(acl_rows),
         "Alias_Detail": pd.DataFrame(alias_rows),
         "Unresolved": pd.DataFrame(unresolved_rows),
         "Raw_Commands": pd.DataFrame(raw_rows),
     }
+
+
+def _group_local_role_networks(
+    definitions: list[RoleNetworkDefinition],
+) -> dict[str, list[RoleNetworkDefinition]]:
+    grouped: dict[str, list[RoleNetworkDefinition]] = {}
+    for definition in definitions:
+        grouped.setdefault(definition.role.casefold(), []).append(definition)
+    return grouped
+
+
+def _local_network_status_by_role(
+    parsed: ParsedController,
+    local_lookup: dict[str, list[RoleNetworkDefinition]],
+    local_mapping_enabled: bool,
+) -> dict[str, dict[str, str]]:
+    if not local_mapping_enabled:
+        return {}
+
+    collected_roles = (
+        set(parsed.role_policies)
+        | set(parsed.user_role_observations)
+        | {mapping.role for mapping in parsed.ssid_role_mappings if mapping.role}
+    )
+    collected_role_keys = {role.casefold() for role in collected_roles}
+    local_roles = {
+        definitions[0].role
+        for definitions in local_lookup.values()
+        if definitions and definitions[0].role.casefold() not in collected_role_keys
+    }
+    statuses: dict[str, dict[str, str]] = {}
+
+    for role in sorted(collected_roles | local_roles, key=str.casefold):
+        definitions = local_lookup.get(role.casefold(), [])
+        local_networks = [definition.network for definition in definitions]
+        wlc_networks = _wlc_configured_subnets_for_role(parsed, role)
+
+        if role.casefold() not in collected_role_keys:
+            status = "Role not collected"
+            notes = "Role exists in the local Excel file, but it was not collected from this WLC."
+        elif not definitions:
+            status = "Local mapping missing"
+            notes = "Role was collected from WLC but was not found in the local Role network Excel."
+        elif wlc_networks and set(local_networks) != set(wlc_networks):
+            status = "Mismatch"
+            notes = f"Local: {', '.join(local_networks)} / WLC collected: {', '.join(wlc_networks)}"
+        elif wlc_networks:
+            status = "Matched"
+            notes = "Local Role network matches WLC configured subnet evidence."
+        else:
+            status = "Local mapping loaded"
+            notes = "No reliable WLC subnet was available for comparison."
+
+        statuses[role] = {
+            "networks": ", ".join(local_networks),
+            "status": status,
+            "notes": notes,
+            "wlc_configured_subnets": ", ".join(wlc_networks),
+        }
+    return statuses
+
+
+def _local_network_rows(
+    parsed: ParsedController,
+    local_lookup: dict[str, list[RoleNetworkDefinition]],
+    status_by_role: dict[str, dict[str, str]],
+    local_mapping_enabled: bool,
+) -> list[dict[str, Any]]:
+    if not local_mapping_enabled:
+        return []
+
+    rows: list[dict[str, Any]] = []
+    for role, status in sorted(status_by_role.items(), key=lambda item: item[0].casefold()):
+        definitions = local_lookup.get(role.casefold(), [])
+        if not definitions:
+            rows.append(
+                {
+                    "controller": parsed.controller.name,
+                    "role": role,
+                    "local_role_network": "",
+                    "subnet_mask": "",
+                    "source_file": "",
+                    "source_row": "",
+                    "status": status["status"],
+                    "notes": status["notes"],
+                    "wlc_configured_subnets": status["wlc_configured_subnets"],
+                }
+            )
+            continue
+        for definition in definitions:
+            rows.append(
+                {
+                    "controller": parsed.controller.name,
+                    "role": role,
+                    "local_role_network": definition.network,
+                    "subnet_mask": definition.subnet_mask,
+                    "source_file": definition.source_file,
+                    "source_row": definition.source_row,
+                    "status": status["status"],
+                    "notes": status["notes"],
+                    "wlc_configured_subnets": status["wlc_configured_subnets"],
+                }
+            )
+    return rows
+
+
+def _empty_local_network_status() -> dict[str, str]:
+    return {
+        "networks": "",
+        "status": "",
+        "notes": "",
+        "wlc_configured_subnets": "",
+    }
+
+
+def _wlc_configured_subnets_for_role(parsed: ParsedController, role: str) -> list[str]:
+    networks = [
+        context.configured_subnet
+        for context in parsed.role_network_contexts
+        if context.role.casefold() == role.casefold()
+        and context.configured_subnet
+        and context.configured_subnet.casefold() != "unknown"
+    ]
+    return list(dict.fromkeys(networks))
 
 
 def _role_network_summary(parsed: ParsedController, role: str) -> str:
@@ -255,9 +423,18 @@ def _role_network_summary(parsed: ParsedController, role: str) -> str:
     return ", ".join(dict.fromkeys(networks)) or "Unknown"
 
 
-def _acl_field_interpretation(value: str) -> str:
+def _acl_field_interpretation(
+    value: str,
+    *,
+    local_networks: str = "",
+    local_mapping_enabled: bool = False,
+) -> str:
     normalized = value.strip().lower()
     if normalized == "user":
+        if local_networks:
+            return f"User IP (current client assigned to this role). Local Role Network: {local_networks}"
+        if local_mapping_enabled:
+            return "User IP (current client assigned to this role). Local Role Network: mapping missing."
         return "User IP (current client assigned to this role)"
     if normalized == "any":
         return "Any (0.0.0.0/0)"
@@ -283,12 +460,19 @@ def _write_excel(path: Path, frames: dict[str, pd.DataFrame]) -> None:
                 worksheet.column_dimensions[get_column_letter(column_cells[0].column)].width = max_length + 2
 
 
-def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
+def _write_html(
+    path: Path,
+    frames: dict[str, pd.DataFrame],
+    *,
+    local_role_networks_enabled: bool = False,
+) -> None:
     overview = frames["Overview"].to_dict(orient="records")
     role_network_rows = frames["Role_Network_Context"].to_dict(orient="records")
+    local_network_rows = frames["Local_Role_Networks"].to_dict(orient="records")
     acl_rows = frames["Role_ACL_Detail"].to_dict(orient="records")
     alias_rows = frames["Alias_Detail"].to_dict(orient="records")
     alias_lookup = _group_by_alias(alias_rows)
+    local_network_lookup = _group_local_network_rows(local_network_rows)
     role_user_counts = _role_observed_user_counts(role_network_rows)
     unresolved_count = len(frames["Unresolved"])
 
@@ -339,6 +523,7 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
             <h3>{escape(str(item['role']))}</h3>
             <span>{len(item['rows'])} rules / {item['user_count']} observed users</span>
           </div>
+          {_local_role_network_html(local_network_lookup.get(str(item['role']), []), local_role_networks_enabled)}
           <table>
             <thead><tr><th>ACL</th><th>#</th><th>Action</th><th>Source</th><th>Destination</th><th>Service</th><th class="raw-column">Raw</th><th>Comment</th></tr></thead>
             <tbody>
@@ -433,6 +618,43 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
     }}
     .role-tab-name {{ font-size: 13px; }}
     .role-tab-meta {{ color: var(--muted); font-size: 11px; font-weight: 400; }}
+    .local-network {{
+      background: #f8fafc;
+      border-top: 1px solid var(--line);
+      padding: 10px 14px 12px;
+    }}
+    .local-network-title {{
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 7px;
+      text-transform: uppercase;
+    }}
+    .local-subnet-pill {{
+      align-items: center;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      display: inline-flex;
+      gap: 6px;
+      margin: 3px 6px 3px 0;
+      padding: 4px 8px;
+    }}
+    .local-network-status {{
+      border-radius: 999px;
+      color: #ffffff;
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      margin: 3px 6px 3px 0;
+      padding: 4px 8px;
+    }}
+    .local-network-status.status-matched {{ background: #05603a; }}
+    .local-network-status.status-missing {{ background: #b42318; }}
+    .local-network-status.status-mismatch {{ background: #c2410c; }}
+    .local-network-status.status-loaded {{ background: #0f6cbd; }}
+    .local-network-status.status-not-collected {{ background: #667085; }}
+    .local-network-notes {{ color: var(--muted); font-size: 12px; margin-top: 5px; }}
     table {{ width: 100%; border-collapse: collapse; background: var(--panel); }}
     th, td {{ border-bottom: 1px solid var(--line); padding: 9px 10px; text-align: left; vertical-align: top; font-size: 13px; }}
     th {{ background: #1f4e78; color: #fff; position: sticky; top: 0; }}
@@ -890,6 +1112,53 @@ def _alias_type_class(entry_type: str) -> str:
     return "raw"
 
 
+def _local_role_network_html(rows: list[dict[str, Any]], enabled: bool) -> str:
+    if not enabled:
+        return ""
+
+    if not rows:
+        status = "Local mapping missing"
+        notes = "Role was collected from WLC but was not found in the local Role network Excel."
+        networks: list[str] = []
+    else:
+        status = str(rows[0].get("status", "") or "Local mapping loaded")
+        notes = str(rows[0].get("notes", ""))
+        networks = [
+            str(row.get("local_role_network", "")).strip()
+            for row in rows
+            if str(row.get("local_role_network", "")).strip()
+        ]
+
+    network_html = "".join(
+        f'<span class="local-subnet-pill"><strong>LOCAL</strong><span>{escape(network)}</span></span>'
+        for network in dict.fromkeys(networks)
+    )
+    if not network_html:
+        network_html = '<span class="notice">No local network is defined for this Role.</span>'
+
+    return f"""
+    <div class="local-network">
+      <div class="local-network-title">Local Role Network</div>
+      <span class="local-network-status {_local_network_status_class(status)}">{escape(status)}</span>
+      {network_html}
+      <div class="local-network-notes">{escape(notes)}</div>
+    </div>
+    """
+
+
+def _local_network_status_class(status: str) -> str:
+    normalized = status.casefold()
+    if "mismatch" in normalized:
+        return "status-mismatch"
+    if "missing" in normalized:
+        return "status-missing"
+    if "matched" in normalized:
+        return "status-matched"
+    if "not collected" in normalized:
+        return "status-not-collected"
+    return "status-loaded"
+
+
 def _alias_name_from_field(value: str) -> str:
     stripped = value.strip()
     if stripped.lower().startswith("alias "):
@@ -901,6 +1170,15 @@ def _group_by_alias(alias_rows: list[dict[str, Any]]) -> dict[str, list[dict[str
     grouped: dict[str, list[dict[str, Any]]] = {}
     for row in alias_rows:
         grouped.setdefault(str(row.get("alias", "")), []).append(row)
+    return dict(sorted(grouped.items()))
+
+
+def _group_local_network_rows(rows: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        role = str(row.get("role", "")).strip()
+        if role:
+            grouped.setdefault(role, []).append(row)
     return dict(sorted(grouped.items()))
 
 

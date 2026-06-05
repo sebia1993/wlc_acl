@@ -14,6 +14,7 @@ from .diagnostics import classify_error_message, summarize_collection_failure
 from .gui_support import GuiConnectionInput, build_target_from_gui_input, default_gui_output_dir
 from .models import CollectionResult, CommandOutput
 from .report import build_parsed_controllers, timestamp_slug, write_raw_result, write_reports
+from .role_networks import RoleNetworkDefinitionError, load_role_network_definitions
 
 
 class WlcRoleAclCollectorGui(tk.Tk):
@@ -39,6 +40,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
         self.password_var = tk.StringVar()
         self.enable_password_var = tk.StringVar()
         self.output_dir_var = tk.StringVar(value=str(default_gui_output_dir()))
+        self.role_networks_path_var = tk.StringVar()
         self.timeout_var = tk.IntVar(value=60)
         self.status_var = tk.StringVar(value="Ready")
 
@@ -126,6 +128,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
         ttk.Button(output_row, text="Browse", style="Soft.TButton", command=self._browse_output).pack(
             side="left", padx=(8, 0)
         )
+        self._role_networks_row(form)
         self._timeout_row(form)
 
         right = tk.Frame(body, bg="#f4f7fb")
@@ -243,6 +246,23 @@ class WlcRoleAclCollectorGui(tk.Tk):
         tk.Label(row, text="Timeout seconds", bg="#ffffff", fg="#344054", font=("Segoe UI", 9)).pack(anchor="w")
         ttk.Spinbox(row, from_=5, to=600, textvariable=self.timeout_var, width=12).pack(anchor="w", pady=(3, 0))
 
+    def _role_networks_row(self, parent: tk.Widget) -> None:
+        row = tk.Frame(parent, bg="#ffffff")
+        row.pack(fill="x", pady=(0, 8))
+        tk.Label(row, text="Role network Excel", bg="#ffffff", fg="#344054", font=("Segoe UI", 9)).pack(anchor="w")
+        input_row = tk.Frame(row, bg="#ffffff")
+        input_row.pack(fill="x", pady=(3, 0))
+        ttk.Entry(input_row, textvariable=self.role_networks_path_var, width=34).pack(side="left", fill="x", expand=True)
+        ttk.Button(input_row, text="Browse", style="Soft.TButton", command=self._browse_role_networks).pack(
+            side="left", padx=(8, 0)
+        )
+        ttk.Label(
+            row,
+            text="Optional. Columns: Role name, network, subnet mask.",
+            style="Muted.TLabel",
+            wraplength=295,
+        ).pack(anchor="w", pady=(3, 0))
+
     def _on_protocol_changed(self, *_args: object) -> None:
         current = self.port_var.get().strip()
         protocol = self.protocol_var.get().strip().lower()
@@ -256,6 +276,14 @@ class WlcRoleAclCollectorGui(tk.Tk):
         if selected:
             self.output_dir_var.set(selected)
 
+    def _browse_role_networks(self) -> None:
+        selected = filedialog.askopenfilename(
+            title="Select Role network Excel",
+            filetypes=(("Excel files", "*.xlsx *.xlsm"), ("All files", "*.*")),
+        )
+        if selected:
+            self.role_networks_path_var.set(selected)
+
     def _start_collection(self) -> None:
         if self.is_running:
             return
@@ -266,12 +294,21 @@ class WlcRoleAclCollectorGui(tk.Tk):
             messagebox.showerror("입력 오류", str(exc))
             return
 
+        try:
+            role_networks_path = self.role_networks_path_var.get().strip()
+            role_networks = (
+                load_role_network_definitions(Path(role_networks_path)) if role_networks_path else []
+            )
+        except RoleNetworkDefinitionError as exc:
+            messagebox.showerror("Role network Excel error", str(exc))
+            return
+
         output_dir = Path(self.output_dir_var.get().strip() or "outputs")
         self._set_running(True)
         self._log("Starting collection")
         self.worker = threading.Thread(
             target=self._run_collection_worker,
-            args=(target, output_dir, timeout),
+            args=(target, output_dir, timeout, role_networks, role_networks_path),
             daemon=True,
         )
         self.worker.start()
@@ -293,7 +330,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
         except (tk.TclError, ValueError) as exc:
             raise ValueError("Timeout seconds must be a number.") from exc
 
-    def _run_collection_worker(self, target, output_dir: Path, timeout: int) -> None:
+    def _run_collection_worker(self, target, output_dir: Path, timeout: int, role_networks, role_networks_path: str) -> None:
         run_dir = output_dir / timestamp_slug()
         log_lines = [
             "WLC Role ACL Collector run log",
@@ -303,6 +340,8 @@ class WlcRoleAclCollectorGui(tk.Tk):
             f"Port: {target.controller.port}",
             f"Timeout seconds: {timeout}",
         ]
+        if role_networks_path:
+            log_lines.append(f"Role network Excel: {role_networks_path}")
 
         def progress(event: str, payload: dict[str, object]) -> None:
             status, lines = format_collection_progress(event, payload)
@@ -315,6 +354,8 @@ class WlcRoleAclCollectorGui(tk.Tk):
         try:
             self.event_queue.put(("status", f"Connecting to {target.controller.host}"))
             self.event_queue.put(("log", f"Controller: {target.controller.name} ({target.controller.protocol}:{target.controller.port})"))
+            if role_networks:
+                self.event_queue.put(("log", f"Loaded local Role networks: {len(role_networks)} row(s)"))
             result = collect_from_controller(
                 target.controller,
                 timeout=timeout,
@@ -343,7 +384,12 @@ class WlcRoleAclCollectorGui(tk.Tk):
             self.event_queue.put(("log", "Building Excel/HTML reports"))
             log_lines.append("Building Excel/HTML reports")
             parsed = build_parsed_controllers([result])
-            files = write_reports(parsed_controllers=parsed, collection_results=[result], output_dir=run_dir)
+            files = write_reports(
+                parsed_controllers=parsed,
+                collection_results=[result],
+                output_dir=run_dir,
+                local_role_networks=role_networks,
+            )
             log_lines.extend(["Status: completed", f"Excel: {files['xlsx']}", f"HTML: {files['html']}"])
             _write_run_log(run_dir, log_lines)
             payload = {"run_dir": run_dir, "html": files["html"], "xlsx": files["xlsx"]}

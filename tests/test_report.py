@@ -3,7 +3,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 from wlc_role_acl_collector.collector import collect_from_offline_raw
-from wlc_role_acl_collector.models import Controller
+from wlc_role_acl_collector.models import Controller, RoleNetworkDefinition
 from wlc_role_acl_collector.report import (
     _sort_acl_rows_for_role,
     build_parsed_controllers,
@@ -28,6 +28,7 @@ def test_write_excel_and_html_report(tmp_path):
         "Overview",
         "SSID_Role_Map",
         "Role_Network_Context",
+        "Local_Role_Networks",
         "Role_ACL_Detail",
         "Alias_Detail",
         "Unresolved",
@@ -74,6 +75,7 @@ def test_write_excel_and_html_report(tmp_path):
     assert "<th>VAP VLAN</th>" not in html
     assert "<th>Effective VLAN</th>" not in html
     assert "Role User Network" not in html
+    assert "Local Role Network" not in html
     assert "Configured Subnet" not in html
     assert "network-context" not in html
     assert "network-chip" not in html
@@ -126,6 +128,59 @@ def test_write_excel_and_html_report(tmp_path):
     assert "[show user-table output redacted]" in raw_text
     assert "corp-user-2" not in raw_text
     assert "aa:bb:cc" not in raw_text
+
+
+def test_write_report_includes_local_role_network_mapping(tmp_path):
+    fixture_root = Path(__file__).parent / "fixtures"
+    controller = Controller(name="sample_controller", host="192.0.2.10")
+    result = collect_from_offline_raw(controller, fixture_root)
+    parsed = build_parsed_controllers([result])
+    local_role_networks = [
+        RoleNetworkDefinition(
+            role="guest-logon",
+            network="10.30.0.0/24",
+            subnet_mask="255.255.255.0",
+            source_file="role_networks.xlsx",
+            source_row=2,
+        ),
+        RoleNetworkDefinition(
+            role="guest-logon",
+            network="10.31.0.0/24",
+            subnet_mask="255.255.255.0",
+            source_file="role_networks.xlsx",
+            source_row=3,
+        ),
+    ]
+
+    files = write_reports(
+        parsed_controllers=parsed,
+        collection_results=[result],
+        output_dir=tmp_path,
+        local_role_networks=local_role_networks,
+    )
+
+    workbook = load_workbook(files["xlsx"], read_only=True)
+    acl_headers = [cell.value for cell in next(workbook["Role_ACL_Detail"].iter_rows(max_row=1))]
+    assert "local_role_networks" in acl_headers
+    assert "local_network_status" in acl_headers
+    assert "local_network_notes" in acl_headers
+    local_rows = [
+        {header: value for header, value in zip(
+            [cell.value for cell in next(workbook["Local_Role_Networks"].iter_rows(max_row=1))],
+            row,
+        )}
+        for row in workbook["Local_Role_Networks"].iter_rows(min_row=2, values_only=True)
+    ]
+    assert any(row["role"] == "guest-logon" and row["status"] == "Mismatch" for row in local_rows)
+    assert any(row["role"] == "corp-employee" and row["status"] == "Local mapping missing" for row in local_rows)
+
+    html = files["html"].read_text(encoding="utf-8")
+    assert "Local Role Network" in html
+    assert "10.30.0.0/24" in html
+    assert "10.31.0.0/24" in html
+    assert "Mismatch" in html
+    assert "Local mapping missing" in html
+    assert "Local Role Network: 10.30.0.0/24, 10.31.0.0/24" in html
 
 
 def test_sort_acl_rows_prioritizes_exact_role_acl():

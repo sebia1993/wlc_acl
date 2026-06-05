@@ -289,7 +289,6 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
     acl_rows = frames["Role_ACL_Detail"].to_dict(orient="records")
     alias_rows = frames["Alias_Detail"].to_dict(orient="records")
     alias_lookup = _group_by_alias(alias_rows)
-    role_network_lookup = _group_role_networks(role_network_rows)
     role_user_counts = _role_observed_user_counts(role_network_rows)
     unresolved_count = len(frames["Unresolved"])
 
@@ -340,7 +339,6 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
             <h3>{escape(str(item['role']))}</h3>
             <span>{len(item['rows'])} rules / {item['user_count']} observed users</span>
           </div>
-          {_role_network_context_html(role_network_lookup.get(str(item['role']), []))}
           <table>
             <thead><tr><th>ACL</th><th>#</th><th>Action</th><th>Source</th><th>Destination</th><th>Service</th><th class="raw-column">Raw</th><th>Comment</th></tr></thead>
             <tbody>
@@ -391,41 +389,6 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
     }}
     .metric span, .metric small {{ color: var(--muted); display: block; }}
     .metric strong {{ font-size: 28px; display: block; margin: 4px 0; }}
-    .network-context {{
-      background: #f8fafc;
-      border-top: 1px solid var(--line);
-      padding: 10px 14px;
-    }}
-    .network-context-title {{
-      color: var(--muted);
-      font-size: 12px;
-      margin-bottom: 6px;
-      text-transform: uppercase;
-    }}
-    .network-context-row {{
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin: 4px 0;
-    }}
-    .network-chip {{
-      background: #ffffff;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      display: inline-flex;
-      gap: 5px;
-      padding: 4px 8px;
-    }}
-    .network-chip b {{ color: #344054; }}
-    .network-confidence {{
-      border-color: #98a2b3;
-      font-weight: 600;
-    }}
-    .confidence-exact {{ background: #ecfdf3; border-color: #75c99f; color: #05603a; }}
-    .confidence-inherited {{ background: #eff8ff; border-color: #84caff; color: #175cd3; }}
-    .confidence-dynamic-possible {{ background: #fff7ed; border-color: #fdba74; color: #9a3412; }}
-    .confidence-observed {{ background: #f5f3ff; border-color: #c4b5fd; color: #5b21b6; }}
-    .confidence-unknown {{ background: #f2f4f7; border-color: #d0d5dd; color: #475467; }}
     .report-actions {{
       display: flex;
       gap: 8px;
@@ -899,46 +862,6 @@ def _inline_alias_detail_html(
     """
 
 
-def _role_network_context_html(rows: list[dict[str, Any]]) -> str:
-    if not rows:
-        return """
-        <div class="network-context">
-          <div class="network-context-title">Role User Network</div>
-          <div class="notice">Unknown - no SSID/VLAN mapping was found.</div>
-        </div>
-        """
-
-    rendered_rows = []
-    for row in rows:
-        confidence = str(row.get("network_confidence", "") or "Unknown")
-        rendered_rows.append(
-            f"""
-            <div class="network-context-row">
-              <span class="network-chip network-confidence {_confidence_class(confidence)}"><b>Confidence</b> {escape(confidence)}</span>
-              <span class="network-chip"><b>VLAN</b> {escape(str(row.get('configured_vlan', '') or row.get('effective_vlan', '') or 'Unknown'))}</span>
-              <span class="network-chip"><b>Configured Subnet</b> {escape(str(row.get('configured_subnet', '') or row.get('role_user_network', '') or 'Unknown'))}</span>
-              <span class="network-chip"><b>Assignment</b> {escape(str(row.get('assignment_source', '') or 'Unknown'))}</span>
-              <span class="network-chip"><b>Evidence</b> {escape(str(row.get('network_evidence', '') or 'Unknown'))}</span>
-              <span class="network-chip"><b>Observed Users</b> {escape(str(row.get('observed_user_count', 0)))}</span>
-              <span class="network-chip"><b>Observed Networks</b> {escape(str(row.get('observed_networks', '') or '-'))}</span>
-            </div>
-            """
-        )
-    return f"""
-    <div class="network-context">
-      <div class="network-context-title">Role User Network</div>
-      {''.join(rendered_rows)}
-    </div>
-    """
-
-
-def _confidence_class(value: str) -> str:
-    normalized = value.strip().lower().replace(" ", "-")
-    if normalized in {"exact", "inherited", "dynamic-possible", "observed", "unknown"}:
-        return f"confidence-{normalized}"
-    return "confidence-unknown"
-
-
 def _alias_chips_html(rows: list[dict[str, Any]]) -> str:
     if not rows:
         return '<span class="notice">Alias detail was not collected.</span>'
@@ -978,13 +901,6 @@ def _group_by_alias(alias_rows: list[dict[str, Any]]) -> dict[str, list[dict[str
     grouped: dict[str, list[dict[str, Any]]] = {}
     for row in alias_rows:
         grouped.setdefault(str(row.get("alias", "")), []).append(row)
-    return dict(sorted(grouped.items()))
-
-
-def _group_role_networks(rows: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
-    grouped: dict[str, list[dict[str, Any]]] = {}
-    for row in rows:
-        grouped.setdefault(str(row.get("role", "")), []).append(row)
     return dict(sorted(grouped.items()))
 
 

@@ -73,7 +73,11 @@ def test_write_excel_and_html_report(tmp_path):
     assert "<th>Role Type</th>" not in html
     assert "<th>VAP VLAN</th>" not in html
     assert "<th>Effective VLAN</th>" not in html
-    assert "Role User Network" in html
+    assert "Role User Network" not in html
+    assert "Configured Subnet" not in html
+    assert "network-context" not in html
+    assert "network-chip" not in html
+    assert "network-confidence" not in html
     assert 'class="role-tabs no-print"' in html
     assert 'class="role-tab"' in html
     assert 'role="tab"' in html
@@ -83,13 +87,6 @@ def test_write_excel_and_html_report(tmp_path):
     assert html.index('<span class="role-tab-name">guest-logon</span>') < html.index(
         '<span class="role-tab-name">corp-employee</span>'
     )
-    assert "Confidence" in html
-    assert "Configured Subnet" in html
-    assert "Exact" in html
-    assert "Dynamic Possible" in html
-    assert "user-role vlan" in html
-    assert "10.40.1.0/24" in html
-    assert "10.30.0.0/24" in html
     assert "User IP (current client assigned to this role)" in html
     assert "Any (0.0.0.0/0)" in html
     assert "Source Detail" not in html

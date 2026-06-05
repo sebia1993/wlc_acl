@@ -63,15 +63,25 @@ def test_parse_ssid_role_mapping_and_acl_summary():
     assert corp.effective_vlan == "40"
     assert corp.role_user_network == "10.40.1.0/24"
     assert corp.network_evidence == "show ip interface brief"
+    assert corp.network_confidence == "Exact"
+    assert corp.assignment_source == "user-role vlan"
+    assert corp.configured_vlan == "40"
+    assert corp.configured_subnet == "10.40.1.0/24"
     assert corp.observed_user_count == 1
 
     guest = rows[("GUEST", "initial", "guest-logon")]
     assert guest.effective_vlan == "30"
     assert guest.role_user_network == "10.30.0.0/24"
     assert guest.network_evidence == "interface vlan configuration"
+    assert guest.network_confidence == "Dynamic Possible"
+    assert guest.assignment_source.startswith("virtual-ap vlan; dynamic role possible")
+    assert guest.configured_vlan == "30"
+    assert guest.configured_subnet == "10.30.0.0/24"
     assert guest.observed_user_count == 2
 
     contexts = {(context.role, context.effective_vlan): context for context in parsed.role_network_contexts}
+    assert contexts[("corp-employee", "40")].network_confidence == "Exact"
+    assert contexts[("guest-logon", "30")].network_confidence == "Dynamic Possible"
     assert contexts[("corp-employee", "40")].observed_networks == ["10.40.1.0/24"]
     assert contexts[("guest-logon", "30")].observed_networks == ["10.30.0.0/24"]
 

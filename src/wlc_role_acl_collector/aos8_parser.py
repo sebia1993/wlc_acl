@@ -572,39 +572,54 @@ def _parse_user_table_summary(
 
 
 def _apply_role_network_context(parsed: ParsedController) -> None:
-    contexts: dict[tuple[str, str], RoleNetworkContext] = {}
+    contexts: dict[tuple[str, str, str, str], RoleNetworkContext] = {}
 
     for mapping in parsed.ssid_role_mappings:
         policy = parsed.role_policies.get(mapping.role)
-        effective_vlan = _normalize_vlan(policy.vlan if policy and policy.vlan else mapping.vlan)
+        role_vlan = _normalize_vlan(policy.vlan if policy and policy.vlan else "")
+        vap_vlan = _normalize_vlan(mapping.vlan)
+        effective_vlan, confidence, assignment_source = _network_assignment_for_mapping(
+            role_vlan=role_vlan,
+            vap_vlan=vap_vlan,
+            mapping=mapping,
+        )
         mapping.effective_vlan = effective_vlan
+        mapping.network_confidence = confidence
+        mapping.assignment_source = assignment_source
+        mapping.configured_vlan = effective_vlan
 
         vlan_network = parsed.vlan_networks.get(effective_vlan)
         if vlan_network is None:
             mapping.role_user_network = "Unknown"
-            mapping.network_evidence = "VLAN subnet not found"
+            mapping.configured_subnet = "Unknown"
+            mapping.network_evidence = "VLAN subnet not found" if effective_vlan else "No VLAN mapping found"
         else:
             mapping.role_user_network = vlan_network.network
+            mapping.configured_subnet = vlan_network.network
             mapping.network_evidence = vlan_network.evidence
 
         observation = parsed.user_role_observations.get(mapping.role)
         if observation is not None:
             mapping.observed_user_count = observation.observed_user_count
 
-        key = (mapping.role, effective_vlan)
+        key = (mapping.role, effective_vlan, confidence, assignment_source)
         context = contexts.get(key)
         if context is None:
-            notes = ""
-            if not effective_vlan:
-                notes = "No VLAN was found for this Role mapping."
-            elif vlan_network is None:
-                notes = "VLAN was found, but no subnet evidence was collected."
+            notes = _role_network_notes(
+                effective_vlan=effective_vlan,
+                vlan_network_found=vlan_network is not None,
+                mapping=mapping,
+            )
             context = RoleNetworkContext(
                 controller=parsed.controller.name,
                 role=mapping.role,
                 effective_vlan=effective_vlan,
                 role_user_network=mapping.role_user_network,
                 network_evidence=mapping.network_evidence,
+                network_confidence=confidence,
+                assignment_source=assignment_source,
+                configured_vlan=mapping.configured_vlan,
+                configured_subnet=mapping.configured_subnet,
                 observed_user_count=observation.observed_user_count if observation else 0,
                 observed_vlans=observation.observed_vlans if observation else [],
                 observed_networks=observation.observed_networks if observation else [],
@@ -622,13 +637,17 @@ def _apply_role_network_context(parsed: ParsedController) -> None:
         if any(context.role == role for context in contexts.values()):
             continue
         observation = parsed.user_role_observations.get(role)
-        key = (role, "")
+        key = (role, "", "Unknown", "No SSID/VLAN mapping found")
         contexts[key] = RoleNetworkContext(
             controller=parsed.controller.name,
             role=role,
             effective_vlan="",
             role_user_network="Unknown",
             network_evidence="No SSID/VLAN mapping found",
+            network_confidence="Unknown",
+            assignment_source="No SSID/VLAN mapping found",
+            configured_vlan="",
+            configured_subnet="Unknown",
             observed_user_count=observation.observed_user_count if observation else 0,
             observed_vlans=observation.observed_vlans if observation else [],
             observed_networks=observation.observed_networks if observation else [],
@@ -637,8 +656,50 @@ def _apply_role_network_context(parsed: ParsedController) -> None:
 
     parsed.role_network_contexts = sorted(
         contexts.values(),
-        key=lambda item: (item.role, int(item.effective_vlan) if item.effective_vlan.isdigit() else 0, item.effective_vlan),
+        key=lambda item: (
+            item.role,
+            int(item.effective_vlan) if item.effective_vlan.isdigit() else 0,
+            item.effective_vlan,
+            item.network_confidence,
+            item.assignment_source,
+        ),
     )
+
+
+def _network_assignment_for_mapping(
+    *,
+    role_vlan: str,
+    vap_vlan: str,
+    mapping: SsidRoleMapping,
+) -> tuple[str, str, str]:
+    if role_vlan:
+        return role_vlan, "Exact", "user-role vlan"
+    if vap_vlan and mapping.dynamic_role_possible:
+        reason = mapping.dynamic_role_reason or "AAA profile can assign roles dynamically"
+        return vap_vlan, "Dynamic Possible", f"virtual-ap vlan; dynamic role possible ({reason})"
+    if vap_vlan:
+        return vap_vlan, "Inherited", "virtual-ap vlan"
+    if mapping.dynamic_role_possible:
+        reason = mapping.dynamic_role_reason or "AAA profile can assign roles dynamically"
+        return "", "Dynamic Possible", f"no configured VLAN; dynamic role possible ({reason})"
+    return "", "Unknown", "No VLAN mapping found"
+
+
+def _role_network_notes(
+    *,
+    effective_vlan: str,
+    vlan_network_found: bool,
+    mapping: SsidRoleMapping,
+) -> str:
+    notes = []
+    if not effective_vlan:
+        notes.append("No VLAN was found for this Role mapping.")
+    elif not vlan_network_found:
+        notes.append("VLAN was found, but no subnet evidence was collected.")
+    if mapping.dynamic_role_possible:
+        reason = mapping.dynamic_role_reason or "AAA profile can assign roles dynamically"
+        notes.append(f"Dynamic role assignment possible: {reason}.")
+    return " ".join(notes)
 
 
 def _parse_acl_rules(controller_name: str, acl_name: str, lines: list[str]) -> list[AclRule]:

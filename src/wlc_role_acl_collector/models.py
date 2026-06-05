@@ -130,6 +130,10 @@ class RoleNetworkContext:
     effective_vlan: str
     role_user_network: str
     network_evidence: str
+    network_confidence: str = "Unknown"
+    assignment_source: str = ""
+    configured_vlan: str = ""
+    configured_subnet: str = "Unknown"
     ssids: list[str] = field(default_factory=list)
     ap_groups: list[str] = field(default_factory=list)
     observed_user_count: int = 0
@@ -154,6 +158,10 @@ class SsidRoleMapping:
     effective_vlan: str = ""
     role_user_network: str = "Unknown"
     network_evidence: str = ""
+    network_confidence: str = "Unknown"
+    assignment_source: str = ""
+    configured_vlan: str = ""
+    configured_subnet: str = "Unknown"
     observed_user_count: int = 0
     dynamic_role_possible: bool = False
     dynamic_role_reason: str = ""

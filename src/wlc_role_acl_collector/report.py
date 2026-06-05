@@ -113,6 +113,10 @@ def _build_frames(
                     "effective_vlan": context.effective_vlan,
                     "role_user_network": context.role_user_network,
                     "network_evidence": context.network_evidence,
+                    "network_confidence": context.network_confidence,
+                    "assignment_source": context.assignment_source,
+                    "configured_vlan": context.configured_vlan,
+                    "configured_subnet": context.configured_subnet,
                     "ssids": ", ".join(context.ssids),
                     "ap_groups": ", ".join(context.ap_groups),
                     "observed_user_count": context.observed_user_count,
@@ -136,6 +140,10 @@ def _build_frames(
                     "effective_vlan": mapping.effective_vlan,
                     "role_user_network": mapping.role_user_network,
                     "network_evidence": mapping.network_evidence,
+                    "network_confidence": mapping.network_confidence,
+                    "assignment_source": mapping.assignment_source,
+                    "configured_vlan": mapping.configured_vlan,
+                    "configured_subnet": mapping.configured_subnet,
                     "observed_user_count": mapping.observed_user_count,
                     "forward_mode": mapping.forward_mode,
                     "access_summary": mapping.access_summary,
@@ -307,6 +315,9 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
           <td><button class="role-link" type="button" data-target="{escape(str(row.get('role', '')))}">{escape(str(row.get('role', '')))}</button></td>
           <td>{escape(str(row.get('vlan', '')))}</td>
           <td>{escape(str(row.get('effective_vlan', '')))}</td>
+          <td>{escape(str(row.get('network_confidence', '')))}</td>
+          <td>{escape(str(row.get('assignment_source', '')))}</td>
+          <td>{escape(str(row.get('configured_subnet', '')))}</td>
           <td>{escape(str(row.get('role_user_network', '')))}</td>
           <td>{escape(str(row.get('network_evidence', '')))}</td>
           <td>{escape(str(row.get('observed_user_count', '')))}</td>
@@ -402,6 +413,15 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
       padding: 4px 8px;
     }}
     .network-chip b {{ color: #344054; }}
+    .network-confidence {{
+      border-color: #98a2b3;
+      font-weight: 600;
+    }}
+    .confidence-exact {{ background: #ecfdf3; border-color: #75c99f; color: #05603a; }}
+    .confidence-inherited {{ background: #eff8ff; border-color: #84caff; color: #175cd3; }}
+    .confidence-dynamic-possible {{ background: #fff7ed; border-color: #fdba74; color: #9a3412; }}
+    .confidence-observed {{ background: #f5f3ff; border-color: #c4b5fd; color: #5b21b6; }}
+    .confidence-unknown {{ background: #f2f4f7; border-color: #d0d5dd; color: #475467; }}
     .toolbar {{ display: flex; gap: 10px; align-items: center; margin: 18px 0 10px; }}
     input {{
       width: min(520px, 100%);
@@ -513,6 +533,18 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
       display: none;
       white-space: pre-wrap;
     }}
+    .comment-status {{
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 4px;
+    }}
+    .comment-status[data-state="saved"],
+    .comment-status[data-state="restored"] {{
+      color: #05603a;
+    }}
+    .comment-status[data-state="unavailable"] {{
+      color: #b42318;
+    }}
     .notice {{ color: var(--muted); margin: 8px 0 0; }}
     @media print {{
       body {{ background: #ffffff; }}
@@ -533,6 +565,7 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
         min-height: 20px;
         white-space: pre-wrap;
       }}
+      .comment-status {{ display: none; }}
     }}
   </style>
 </head>
@@ -553,7 +586,7 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
     <div class="table-wrap">
       <table id="ssid-table">
         <thead>
-          <tr><th>Controller</th><th>SSID</th><th>AP Group</th><th>AAA Profile</th><th>Role Type</th><th>Role</th><th>VAP VLAN</th><th>Effective VLAN</th><th>Role User Network</th><th>Evidence</th><th>Observed Users</th><th>Access</th><th>Dynamic</th></tr>
+          <tr><th>Controller</th><th>SSID</th><th>AP Group</th><th>AAA Profile</th><th>Role Type</th><th>Role</th><th>VAP VLAN</th><th>Effective VLAN</th><th>Confidence</th><th>Assignment</th><th>Configured Subnet</th><th>Role User Network</th><th>Evidence</th><th>Observed Users</th><th>Access</th><th>Dynamic</th></tr>
         </thead>
         <tbody>{ssid_table}</tbody>
       </table>
@@ -593,6 +626,16 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
     }}
     const commentsDataElement = document.querySelector('#acl-comments-data');
     const commentInputs = Array.from(document.querySelectorAll('.comment-input'));
+    const commentStorageKey = `wlc-role-acl-comments:${{location.pathname || document.title}}`;
+    const commentStorageAvailable = (() => {{
+      try {{
+        localStorage.setItem('wlc-role-acl-storage-test', '1');
+        localStorage.removeItem('wlc-role-acl-storage-test');
+        return true;
+      }} catch (_error) {{
+        return false;
+      }}
+    }})();
     let aclComments = {{}};
 
     function readEmbeddedComments() {{
@@ -607,6 +650,33 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
       const text = JSON.stringify(aclComments, null, 2);
       commentsDataElement.value = text;
       commentsDataElement.textContent = text;
+    }}
+
+    function readStoredComments() {{
+      if (!commentStorageAvailable) {{
+        return {{}};
+      }}
+      try {{
+        return JSON.parse(localStorage.getItem(commentStorageKey) || '{{}}');
+      }} catch (_error) {{
+        return {{}};
+      }}
+    }}
+
+    function persistComments() {{
+      if (!commentStorageAvailable) {{
+        return;
+      }}
+      localStorage.setItem(commentStorageKey, JSON.stringify(aclComments));
+    }}
+
+    function setCommentStatus(input, text, state) {{
+      const status = document.getElementById(`${{input.dataset.commentId}}-status`);
+      if (!status) {{
+        return;
+      }}
+      status.textContent = text;
+      status.dataset.state = state || '';
     }}
 
     function updateCommentPrint(input) {{
@@ -625,6 +695,7 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
         updateCommentPrint(input);
       }}
       syncCommentsData();
+      persistComments();
     }}
 
     function syncTextareaDomValues() {{
@@ -661,15 +732,27 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
       link.remove();
     }}
 
-    aclComments = readEmbeddedComments();
+    const embeddedComments = readEmbeddedComments();
+    const storedComments = readStoredComments();
+    const hasStoredComments = Object.keys(storedComments).length > 0;
+    aclComments = Object.assign({{}}, embeddedComments, storedComments);
     for (const input of commentInputs) {{
       input.value = aclComments[input.dataset.commentId] || '';
       updateCommentPrint(input);
+      if (!commentStorageAvailable) {{
+        setCommentStatus(input, '브라우저 자동 저장 불가', 'unavailable');
+      }} else if (hasStoredComments && input.value) {{
+        setCommentStatus(input, '임시저장 복원됨', 'restored');
+      }} else {{
+        setCommentStatus(input, '입력 시 자동 저장', '');
+      }}
       input.addEventListener('input', () => {{
         collectComments();
+        setCommentStatus(input, '저장됨', 'saved');
       }});
     }}
     syncCommentsData();
+    persistComments();
 
     document.querySelector('#save-commented-html').addEventListener('click', saveCommentedHtml);
     document.querySelector('#print-pdf').addEventListener('click', () => {{
@@ -713,6 +796,7 @@ def _acl_rows_html(
               <td class="raw">{escape(str(row.get('raw_rule', '')))}</td>
               <td class="comment-cell">
                 <textarea class="comment-input" data-comment-id="{escape(comment_id)}" aria-label="ACL comment"></textarea>
+                <div id="{escape(comment_id)}-status" class="comment-status">입력 시 자동 저장</div>
                 <div id="{escape(comment_id)}-print" class="comment-print"></div>
               </td>
             </tr>
@@ -780,11 +864,14 @@ def _role_network_context_html(rows: list[dict[str, Any]]) -> str:
 
     rendered_rows = []
     for row in rows:
+        confidence = str(row.get("network_confidence", "") or "Unknown")
         rendered_rows.append(
             f"""
             <div class="network-context-row">
-              <span class="network-chip"><b>VLAN</b> {escape(str(row.get('effective_vlan', '') or 'Unknown'))}</span>
-              <span class="network-chip"><b>Subnet</b> {escape(str(row.get('role_user_network', '') or 'Unknown'))}</span>
+              <span class="network-chip network-confidence {_confidence_class(confidence)}">{escape(confidence)}</span>
+              <span class="network-chip"><b>VLAN</b> {escape(str(row.get('configured_vlan', '') or row.get('effective_vlan', '') or 'Unknown'))}</span>
+              <span class="network-chip"><b>Configured Subnet</b> {escape(str(row.get('configured_subnet', '') or row.get('role_user_network', '') or 'Unknown'))}</span>
+              <span class="network-chip"><b>Assignment</b> {escape(str(row.get('assignment_source', '') or 'Unknown'))}</span>
               <span class="network-chip"><b>Evidence</b> {escape(str(row.get('network_evidence', '') or 'Unknown'))}</span>
               <span class="network-chip"><b>Observed Users</b> {escape(str(row.get('observed_user_count', 0)))}</span>
               <span class="network-chip"><b>Observed Networks</b> {escape(str(row.get('observed_networks', '') or '-'))}</span>
@@ -797,6 +884,13 @@ def _role_network_context_html(rows: list[dict[str, Any]]) -> str:
       {''.join(rendered_rows)}
     </div>
     """
+
+
+def _confidence_class(value: str) -> str:
+    normalized = value.strip().lower().replace(" ", "-")
+    if normalized in {"exact", "inherited", "dynamic-possible", "observed", "unknown"}:
+        return f"confidence-{normalized}"
+    return "confidence-unknown"
 
 
 def _alias_chips_html(rows: list[dict[str, Any]]) -> str:

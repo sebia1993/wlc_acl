@@ -43,14 +43,27 @@ def test_write_excel_and_html_report(tmp_path):
     assert "effective_vlan" in ssid_headers
     assert "role_user_network" in ssid_headers
     assert "network_evidence" in ssid_headers
+    assert "network_confidence" in ssid_headers
+    assert "assignment_source" in ssid_headers
+    assert "configured_vlan" in ssid_headers
+    assert "configured_subnet" in ssid_headers
     assert "observed_user_count" in ssid_headers
     context_headers = [cell.value for cell in next(workbook["Role_Network_Context"].iter_rows(max_row=1))]
     assert "role_user_network" in context_headers
+    assert "network_confidence" in context_headers
+    assert "assignment_source" in context_headers
+    assert "configured_vlan" in context_headers
+    assert "configured_subnet" in context_headers
     assert "observed_networks" in context_headers
     html = files["html"].read_text(encoding="utf-8")
     assert "CORP" in html
     assert "<th>Zone</th>" not in html
     assert "Role User Network" in html
+    assert "Confidence" in html
+    assert "Configured Subnet" in html
+    assert "Exact" in html
+    assert "Dynamic Possible" in html
+    assert "user-role vlan" in html
     assert "10.40.1.0/24" in html
     assert "10.30.0.0/24" in html
     assert "User IP (current client assigned to this role)" in html
@@ -62,8 +75,13 @@ def test_write_excel_and_html_report(tmp_path):
     assert 'class="alias-detail-row" hidden' in html
     assert "<th>Comment</th>" in html
     assert 'class="comment-input"' in html
+    assert 'class="comment-status"' in html
     assert 'class="comment-print"' in html
     assert 'id="acl-comments-data"' in html
+    assert "localStorage" in html
+    assert "commentStorageKey" in html
+    assert "임시저장 복원됨" in html
+    assert "저장됨" in html
     assert "주석 포함 HTML 저장" in html
     assert "PDF 저장/인쇄" in html
     assert "window.print()" in html

@@ -118,3 +118,15 @@ Add another controller? [y/N]:
 `no paging`, `show clock`, `show version` 실패는 로그에 기록하고 계속 진행합니다. `show configuration effective` 출력이 없으면 보고서를 만들 수 없어 실패 처리합니다. Role별 `show rights <role>` 실패는 해당 Role만 실패로 기록하고 나머지 보고서 생성을 계속합니다.
 
 `show user-table` 출력은 Role별 현재 접속자 수와 관측 대역 요약에만 사용하며, raw 결과 파일에는 원문 사용자 정보가 저장되지 않습니다. Excel에는 `Role_Network_Context` 시트가 추가되어 Role, Effective VLAN, 사용자 대역, 근거, 관측 사용자 수를 확인할 수 있습니다.
+
+## Role 대역 해석
+
+`Role_Network_Context`와 `SSID_Role_Map`에는 설정 기반 대역과 현재 접속자 관측값을 구분하기 위한 컬럼이 포함됩니다.
+
+- `network_confidence`: `Exact`는 Role에 `user-role vlan`이 직접 설정된 경우입니다. `Inherited`는 Virtual AP VLAN을 상속한 경우입니다. `Dynamic Possible`은 AAA/RADIUS/ClearPass/user-derivation으로 실제 Role/VLAN이 동적으로 바뀔 수 있는 경우입니다. `Unknown`은 설정에서 VLAN 경로를 찾지 못한 경우입니다.
+- `configured_vlan` / `configured_subnet`: 컨트롤러 설정 또는 `show ip interface brief`에서 확인한 VLAN과 subnet입니다.
+- `observed_user_count`, `observed_vlans`, `observed_networks`: `show user-table`에서 현재 관측된 접속자 요약입니다. 참고 근거일 뿐 Role의 공식 subnet으로 단정하지 않습니다.
+
+ACL의 Source/Destination 값이 `user`인 경우는 해당 Role을 받은 현재 사용자 IP를 의미합니다. `any`(`0.0.0.0/0`)와 다르며, `user` 표기만으로 Role의 subnet을 알 수는 없습니다.
+
+HTML 보고서의 ACL 주석은 입력 즉시 브라우저 `localStorage`에 임시 저장됩니다. `주석 포함 HTML 저장`을 누르면 최신 주석이 포함된 독립 HTML 파일을 저장합니다. `PDF 저장/인쇄`는 브라우저 인쇄 기능을 사용하며, PDF에서는 HTML처럼 접기/펼치기 같은 인터랙션이 유지되지 않습니다.

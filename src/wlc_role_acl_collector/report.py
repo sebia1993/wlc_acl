@@ -290,6 +290,7 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
     alias_rows = frames["Alias_Detail"].to_dict(orient="records")
     alias_lookup = _group_by_alias(alias_rows)
     role_network_lookup = _group_role_networks(role_network_rows)
+    role_user_counts = _role_observed_user_counts(role_network_rows)
     unresolved_count = len(frames["Unresolved"])
 
     cards = "\n".join(
@@ -307,20 +308,48 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
     for row in acl_rows:
         acl_by_role.setdefault(str(row.get("role", "")), []).append(row)
 
+    role_items = [
+        {
+            "role": role,
+            "rows": _sort_acl_rows_for_role(role, rows),
+            "user_count": role_user_counts.get(role, 0),
+            "panel_id": f"role-panel-{index}",
+        }
+        for index, (role, rows) in enumerate(
+            sorted(
+                acl_by_role.items(),
+                key=lambda item: (-role_user_counts.get(item[0], 0), item[0].lower()),
+            ),
+            start=1,
+        )
+    ]
+    role_buttons = "\n".join(
+        f"""
+        <button class="role-tab" type="button" role="tab" data-panel-id="{escape(str(item['panel_id']))}"
+          aria-controls="{escape(str(item['panel_id']))}" aria-selected="{'true' if index == 1 else 'false'}">
+          <span class="role-tab-name">{escape(str(item['role']))}</span>
+          <span class="role-tab-meta">{len(item['rows'])} rules / {item['user_count']} users</span>
+        </button>
+        """
+        for index, item in enumerate(role_items, start=1)
+    )
     acl_sections = "\n".join(
         f"""
-        <details class="acl-section" data-role="{escape(role)}">
-          <summary>{escape(role)} <span>{len(rows)} rules</span></summary>
-          {_role_network_context_html(role_network_lookup.get(role, []))}
+        <section class="acl-section role-panel" id="{escape(str(item['panel_id']))}" data-role="{escape(str(item['role']))}" {'hidden' if index != 1 else ''}>
+          <div class="acl-section-header">
+            <h3>{escape(str(item['role']))}</h3>
+            <span>{len(item['rows'])} rules / {item['user_count']} observed users</span>
+          </div>
+          {_role_network_context_html(role_network_lookup.get(str(item['role']), []))}
           <table>
             <thead><tr><th>ACL</th><th>#</th><th>Action</th><th>Source</th><th>Destination</th><th>Service</th><th>Raw</th><th>Comment</th></tr></thead>
             <tbody>
-              {_acl_rows_html(role, rows, alias_lookup)}
+              {_acl_rows_html(str(item['role']), item['rows'], alias_lookup)}
             </tbody>
           </table>
-        </details>
+        </section>
         """
-        for role, rows in sorted(acl_by_role.items())
+        for index, item in enumerate(role_items, start=1)
     )
 
     html = f"""<!doctype html>
@@ -413,6 +442,34 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
       padding: 10px 12px;
     }}
     .report-action.secondary {{ background: #e5eef8; color: #15324b; }}
+    .role-tabs {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 10px 0 12px;
+    }}
+    .role-tab {{
+      align-items: flex-start;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--text);
+      cursor: pointer;
+      display: inline-flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 150px;
+      padding: 9px 12px;
+      text-align: left;
+    }}
+    .role-tab[aria-selected="true"] {{
+      background: #eef6ff;
+      border-color: #84caff;
+      color: #175cd3;
+      font-weight: 600;
+    }}
+    .role-tab-name {{ font-size: 13px; }}
+    .role-tab-meta {{ color: var(--muted); font-size: 11px; font-weight: 400; }}
     table {{ width: 100%; border-collapse: collapse; background: var(--panel); }}
     th, td {{ border-bottom: 1px solid var(--line); padding: 9px 10px; text-align: left; vertical-align: top; font-size: 13px; }}
     th {{ background: #1f4e78; color: #fff; position: sticky; top: 0; }}
@@ -473,8 +530,15 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
       border-radius: 8px;
       overflow: hidden;
     }}
-    .acl-section summary {{ cursor: pointer; padding: 12px 14px; font-weight: 600; }}
-    .acl-section summary span {{ color: var(--muted); font-weight: 400; margin-left: 8px; }}
+    .acl-section-header {{
+      align-items: center;
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      padding: 12px 14px;
+    }}
+    .acl-section-header h3 {{ font-size: 15px; margin: 0; }}
+    .acl-section-header span {{ color: var(--muted); font-size: 12px; }}
     .raw {{ font-family: Consolas, monospace; white-space: pre-wrap; }}
     .comment-cell {{ min-width: 220px; width: 24%; }}
     .comment-input {{
@@ -538,10 +602,36 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
       <button id="print-pdf" class="report-action secondary" type="button">PDF 저장/인쇄</button>
     </div>
     <h2>Role ACL Detail</h2>
+    <div class="role-tabs no-print" role="tablist" aria-label="Role ACL list">
+      {role_buttons}
+    </div>
     {acl_sections}
   </main>
   <textarea id="acl-comments-data" hidden>{{}}</textarea>
   <script>
+    const roleTabs = Array.from(document.querySelectorAll('.role-tab'));
+    const rolePanels = Array.from(document.querySelectorAll('.role-panel'));
+    let selectedRolePanelId = roleTabs.find((button) => button.getAttribute('aria-selected') === 'true')?.dataset.panelId || roleTabs[0]?.dataset.panelId || '';
+
+    function selectRolePanel(panelId) {{
+      selectedRolePanelId = panelId || selectedRolePanelId;
+      for (const panel of rolePanels) {{
+        panel.hidden = panel.id !== selectedRolePanelId;
+      }}
+      for (const button of roleTabs) {{
+        button.setAttribute('aria-selected', String(button.dataset.panelId === selectedRolePanelId));
+      }}
+    }}
+
+    for (const button of roleTabs) {{
+      button.addEventListener('click', () => {{
+        selectRolePanel(button.dataset.panelId);
+      }});
+    }}
+    if (selectedRolePanelId) {{
+      selectRolePanel(selectedRolePanelId);
+    }}
+
     for (const button of document.querySelectorAll('.alias-link')) {{
       button.addEventListener('click', () => {{
         const detailId = button.dataset.detailId;
@@ -634,14 +724,20 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
 
     function preparePrint() {{
       collectComments();
-      for (const section of document.querySelectorAll('.acl-section')) {{
-        section.open = true;
+      for (const panel of rolePanels) {{
+        panel.hidden = false;
       }}
       for (const detail of document.querySelectorAll('.alias-detail-row')) {{
         detail.hidden = false;
       }}
       for (const button of document.querySelectorAll('.alias-link')) {{
         button.setAttribute('aria-expanded', 'true');
+      }}
+    }}
+
+    function restoreScreenView() {{
+      if (selectedRolePanelId) {{
+        selectRolePanel(selectedRolePanelId);
       }}
     }}
 
@@ -688,6 +784,7 @@ def _write_html(path: Path, frames: dict[str, pd.DataFrame]) -> None:
       window.print();
     }});
     window.addEventListener('beforeprint', preparePrint);
+    window.addEventListener('afterprint', restoreScreenView);
   </script>
 </body>
 </html>
@@ -868,6 +965,37 @@ def _group_role_networks(rows: list[dict[str, Any]]) -> dict[str, list[dict[str,
     for row in rows:
         grouped.setdefault(str(row.get("role", "")), []).append(row)
     return dict(sorted(grouped.items()))
+
+
+def _role_observed_user_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        role = str(row.get("role", ""))
+        if not role:
+            continue
+        counts[role] = max(counts.get(role, 0), _int_value(row.get("observed_user_count", 0)))
+    return counts
+
+
+def _sort_acl_rows_for_role(role: str, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    role_name = role.strip()
+    return [
+        row
+        for _, row in sorted(
+            enumerate(rows),
+            key=lambda item: (
+                0 if str(item[1].get("acl", "")).strip() == role_name else 1,
+                item[0],
+            ),
+        )
+    ]
+
+
+def _int_value(value: Any) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _safe_dom_id(value: str) -> str:

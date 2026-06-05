@@ -4,7 +4,12 @@ from openpyxl import load_workbook
 
 from wlc_role_acl_collector.collector import collect_from_offline_raw
 from wlc_role_acl_collector.models import Controller
-from wlc_role_acl_collector.report import build_parsed_controllers, write_raw_result, write_reports
+from wlc_role_acl_collector.report import (
+    _sort_acl_rows_for_role,
+    build_parsed_controllers,
+    write_raw_result,
+    write_reports,
+)
 
 
 def test_write_excel_and_html_report(tmp_path):
@@ -61,6 +66,7 @@ def test_write_excel_and_html_report(tmp_path):
     assert 'id="filter"' not in html
     assert 'id="ssid-table"' not in html
     assert 'class="toolbar no-print"' not in html
+    assert "<details" not in html
     assert "<th>SSID</th>" not in html
     assert "<th>AP Group</th>" not in html
     assert "<th>AAA Profile</th>" not in html
@@ -68,6 +74,15 @@ def test_write_excel_and_html_report(tmp_path):
     assert "<th>VAP VLAN</th>" not in html
     assert "<th>Effective VLAN</th>" not in html
     assert "Role User Network" in html
+    assert 'class="role-tabs no-print"' in html
+    assert 'class="role-tab"' in html
+    assert 'role="tab"' in html
+    assert 'id="role-panel-1" data-role="guest-logon"' in html
+    assert 'aria-selected="true"' in html
+    assert "afterprint" in html
+    assert html.index('<span class="role-tab-name">guest-logon</span>') < html.index(
+        '<span class="role-tab-name">corp-employee</span>'
+    )
     assert "Confidence" in html
     assert "Configured Subnet" in html
     assert "Exact" in html
@@ -105,3 +120,16 @@ def test_write_excel_and_html_report(tmp_path):
     assert "[show user-table output redacted]" in raw_text
     assert "corp-user-2" not in raw_text
     assert "aa:bb:cc" not in raw_text
+
+
+def test_sort_acl_rows_prioritizes_exact_role_acl():
+    rows = [
+        {"acl": "shared-acl", "sequence": 1},
+        {"acl": "guest-logon", "sequence": 2},
+        {"acl": "guest-logon", "sequence": 3},
+        {"acl": "tail-acl", "sequence": 4},
+    ]
+
+    sorted_rows = _sort_acl_rows_for_role("guest-logon", rows)
+
+    assert [row["sequence"] for row in sorted_rows] == [2, 3, 1, 4]

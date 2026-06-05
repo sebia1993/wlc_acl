@@ -5,7 +5,8 @@ from openpyxl import load_workbook
 from wlc_role_acl_collector.collector import collect_from_offline_raw
 from wlc_role_acl_collector.models import Controller, RoleNetworkDefinition
 from wlc_role_acl_collector.report import (
-    _sort_acl_rows_for_role,
+    _acl_rows_html,
+    _is_role_related_acl,
     build_parsed_controllers,
     write_raw_result,
     write_reports,
@@ -120,6 +121,15 @@ def test_write_excel_and_html_report(tmp_path):
     assert "body.raw-visible .raw-column { display: table-cell; }" in html
     assert "document.body.classList.toggle('raw-visible')" in html
     assert "syncRawToggleButton" in html
+    assert 'class="acl-filter-button toggle-other-acls"' in html
+    assert 'data-other-acl-count="5"' in html
+    assert "5 other hidden" in html
+    assert "Show other ACLs" in html
+    assert "Hide other ACLs" in html
+    assert 'class="acl-rule-row other-acl-rule" data-other-acl="true" hidden' in html
+    assert "syncOtherAclRows" in html
+    assert "panel.querySelectorAll('.other-acl-rule')" in html
+    assert "document.querySelectorAll('.other-acl-rule')" in html
     assert 'colspan="8"' in html
     assert "alias-type-host" in html
     assert "alias-type-network" in html
@@ -183,14 +193,22 @@ def test_write_report_includes_local_role_network_mapping(tmp_path):
     assert "Local Role Network: 10.30.0.0/24, 10.31.0.0/24" in html
 
 
-def test_sort_acl_rows_prioritizes_exact_role_acl():
+def test_acl_rows_keep_collection_order_and_hide_other_acls():
     rows = [
         {"acl": "shared-acl", "sequence": 1},
-        {"acl": "guest-logon", "sequence": 2},
-        {"acl": "guest-logon", "sequence": 3},
+        {"acl": "guest-logon-acl", "sequence": 2},
         {"acl": "tail-acl", "sequence": 4},
     ]
 
-    sorted_rows = _sort_acl_rows_for_role("guest-logon", rows)
+    html = _acl_rows_html("guest-logon", rows, {})
 
-    assert [row["sequence"] for row in sorted_rows] == [2, 3, 1, 4]
+    assert html.index("<td>shared-acl</td>") < html.index("<td>guest-logon-acl</td>")
+    assert html.index("<td>guest-logon-acl</td>") < html.index("<td>tail-acl</td>")
+    assert html.count('class="acl-rule-row other-acl-rule" data-other-acl="true" hidden') == 2
+    assert html.count('class="acl-rule-row"') == 1
+
+
+def test_role_related_acl_allows_role_name_inside_acl_name():
+    assert _is_role_related_acl("guest-logon", "guest-logon-acl")
+    assert _is_role_related_acl("guest-logon", "branch-guest-logon-policy")
+    assert not _is_role_related_acl("corp-employee", "corp-acl")

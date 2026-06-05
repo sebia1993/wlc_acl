@@ -494,7 +494,8 @@ def _write_html(
     role_items = [
         {
             "role": role,
-            "rows": _sort_acl_rows_for_role(role, rows),
+            "rows": rows,
+            "other_acl_count": _other_acl_row_count(role, rows),
             "user_count": role_user_counts.get(role, 0),
             "panel_id": f"role-panel-{index}",
         }
@@ -521,9 +522,10 @@ def _write_html(
         <section class="acl-section role-panel" id="{escape(str(item['panel_id']))}" data-role="{escape(str(item['role']))}" {'hidden' if index != 1 else ''}>
           <div class="acl-section-header">
             <h3>{escape(str(item['role']))}</h3>
-            <span>{len(item['rows'])} rules / {item['user_count']} observed users</span>
+            <span>{len(item['rows'])} rules / {item['user_count']} observed users{_other_acl_meta_text(int(item['other_acl_count']))}</span>
           </div>
           {_local_role_network_html(local_network_lookup.get(str(item['role']), []), local_role_networks_enabled)}
+          {_other_acl_toggle_html(str(item['panel_id']), int(item['other_acl_count']))}
           <table>
             <thead><tr><th>ACL</th><th>#</th><th>Action</th><th>Source</th><th>Destination</th><th>Service</th><th class="raw-column">Raw</th><th>Comment</th></tr></thead>
             <tbody>
@@ -655,6 +657,21 @@ def _write_html(
     .local-network-status.status-loaded {{ background: #0f6cbd; }}
     .local-network-status.status-not-collected {{ background: #667085; }}
     .local-network-notes {{ color: var(--muted); font-size: 12px; margin-top: 5px; }}
+    .acl-filter-actions {{
+      background: #ffffff;
+      border-top: 1px solid var(--line);
+      padding: 9px 14px;
+    }}
+    .acl-filter-button {{
+      background: #e5eef8;
+      border: 0;
+      border-radius: 6px;
+      color: #15324b;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 8px 10px;
+    }}
+    .other-acl-rule[hidden] {{ display: none; }}
     table {{ width: 100%; border-collapse: collapse; background: var(--panel); }}
     th, td {{ border-bottom: 1px solid var(--line); padding: 9px 10px; text-align: left; vertical-align: top; font-size: 13px; }}
     th {{ background: #1f4e78; color: #fff; position: sticky; top: 0; }}
@@ -800,6 +817,7 @@ def _write_html(
     const roleTabs = Array.from(document.querySelectorAll('.role-tab'));
     const rolePanels = Array.from(document.querySelectorAll('.role-panel'));
     const rawToggleButton = document.querySelector('#toggle-raw');
+    const otherAclToggles = Array.from(document.querySelectorAll('.toggle-other-acls'));
     let selectedRolePanelId = roleTabs.find((button) => button.getAttribute('aria-selected') === 'true')?.dataset.panelId || roleTabs[0]?.dataset.panelId || '';
 
     function syncRawToggleButton() {{
@@ -817,6 +835,42 @@ def _write_html(
         syncRawToggleButton();
       }});
       syncRawToggleButton();
+    }}
+
+    function syncOtherAclButton(button) {{
+      const count = button.dataset.otherAclCount || '0';
+      const visible = button.getAttribute('aria-pressed') === 'true';
+      button.textContent = visible ? `Hide other ACLs (${{count}})` : `Show other ACLs (${{count}})`;
+    }}
+
+    function syncOtherAclRows(button) {{
+      const panel = button.closest('.role-panel');
+      if (!panel) {{
+        return;
+      }}
+      const visible = button.getAttribute('aria-pressed') === 'true';
+      for (const row of panel.querySelectorAll('.other-acl-rule')) {{
+        row.hidden = !visible;
+      }}
+      if (!visible) {{
+        for (const link of panel.querySelectorAll('.other-acl-rule .alias-link')) {{
+          const detail = document.getElementById(link.dataset.detailId);
+          if (detail) {{
+            detail.hidden = true;
+          }}
+          link.setAttribute('aria-expanded', 'false');
+        }}
+      }}
+      syncOtherAclButton(button);
+    }}
+
+    for (const button of otherAclToggles) {{
+      button.addEventListener('click', () => {{
+        const visible = button.getAttribute('aria-pressed') === 'true';
+        button.setAttribute('aria-pressed', String(!visible));
+        syncOtherAclRows(button);
+      }});
+      syncOtherAclRows(button);
     }}
 
     function selectRolePanel(panelId) {{
@@ -933,6 +987,9 @@ def _write_html(
       for (const panel of rolePanels) {{
         panel.hidden = false;
       }}
+      for (const row of document.querySelectorAll('.other-acl-rule')) {{
+        row.hidden = false;
+      }}
       for (const detail of document.querySelectorAll('.alias-detail-row')) {{
         detail.hidden = false;
       }}
@@ -944,6 +1001,9 @@ def _write_html(
     function restoreScreenView() {{
       if (selectedRolePanelId) {{
         selectRolePanel(selectedRolePanelId);
+      }}
+      for (const button of otherAclToggles) {{
+        syncOtherAclRows(button);
       }}
     }}
 
@@ -1005,6 +1065,9 @@ def _acl_rows_html(
 ) -> str:
     rendered = []
     for index, row in enumerate(rows, start=1):
+        is_other_acl = not _is_role_related_acl(role, str(row.get("acl", "")))
+        row_class = "acl-rule-row other-acl-rule" if is_other_acl else "acl-rule-row"
+        other_acl_attr = ' data-other-acl="true" hidden' if is_other_acl else ""
         comment_id = f"acl-comment-{_safe_dom_id(role)}-{index}"
         detail_id = f"alias-detail-{_safe_dom_id(role)}-{index}"
         source_alias = _alias_name_from_field(str(row.get("source", "")))
@@ -1017,7 +1080,7 @@ def _acl_rows_html(
         )
         rendered.append(
             f"""
-            <tr>
+            <tr class="{row_class}"{other_acl_attr}>
               <td>{escape(str(row.get('acl', '')))}</td>
               <td>{escape(str(row.get('sequence', '')))}</td>
               <td>{escape(str(row.get('action', '')))}</td>
@@ -1035,6 +1098,25 @@ def _acl_rows_html(
             """
         )
     return "".join(rendered)
+
+
+def _other_acl_toggle_html(panel_id: str, other_acl_count: int) -> str:
+    if other_acl_count <= 0:
+        return ""
+    return f"""
+    <div class="acl-filter-actions no-print">
+      <button class="acl-filter-button toggle-other-acls" type="button"
+        data-panel-id="{escape(panel_id)}" data-other-acl-count="{other_acl_count}" aria-pressed="false">
+        Show other ACLs ({other_acl_count})
+      </button>
+    </div>
+    """
+
+
+def _other_acl_meta_text(other_acl_count: int) -> str:
+    if other_acl_count <= 0:
+        return ""
+    return f" / {other_acl_count} other hidden"
 
 
 def _acl_field_html(value: str, detail_id: str, interpretation: str = "") -> str:
@@ -1192,18 +1274,16 @@ def _role_observed_user_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
     return counts
 
 
-def _sort_acl_rows_for_role(role: str, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    role_name = role.strip()
-    return [
-        row
-        for _, row in sorted(
-            enumerate(rows),
-            key=lambda item: (
-                0 if str(item[1].get("acl", "")).strip() == role_name else 1,
-                item[0],
-            ),
-        )
-    ]
+def _other_acl_row_count(role: str, rows: list[dict[str, Any]]) -> int:
+    return sum(1 for row in rows if not _is_role_related_acl(role, str(row.get("acl", ""))))
+
+
+def _is_role_related_acl(role: str, acl_name: str) -> bool:
+    role_name = role.strip().casefold()
+    acl = acl_name.strip().casefold()
+    if not role_name or not acl:
+        return False
+    return acl == role_name or acl.startswith(role_name) or role_name in acl
 
 
 def _int_value(value: Any) -> int:

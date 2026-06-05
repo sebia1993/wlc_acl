@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wlc-role-acl-collector"
+version = "0.1.0"
+description = "Collect Aruba AOS8 WLC SSID, role, and ACL mappings and generate Excel/HTML reports."
+requires-python = ">=3.11"
+dependencies = [
+  "netmiko>=4.0",
+  "openpyxl>=3.1",
+  "pandas>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pyinstaller>=6.0",
+  "pytest>=8.0",
+]
+
+[project.scripts]
+wlc-role-acl-collector = "wlc_role_acl_collector.cli:main"
+wlc-role-acl-gui = "wlc_role_acl_collector.gui_app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

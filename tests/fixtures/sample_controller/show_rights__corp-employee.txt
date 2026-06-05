@@ -1,0 +1,7 @@
+Derived Role = corp-employee
+Up BW: No Limit   Down BW: No Limit
+ACL Number = 101/0
+corp-acl
+    any network 10.0.0.0 255.0.0.0 any deny
+    any any any src-nat
+

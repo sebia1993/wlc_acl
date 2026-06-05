@@ -1,0 +1,6 @@
+Derived Role = guest-logon
+guest-logon-acl
+    user any svc-dhcp permit
+    user any svc-dns permit
+    user alias controller svc-https dst-nat 8081
+

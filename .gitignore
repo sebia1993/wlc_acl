@@ -1,0 +1,30 @@
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Python packaging/build artifacts
+*.egg-info/
+.eggs/
+build/
+dist/
+*.whl
+
+# PyInstaller artifacts
+.pyinstaller_build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local/editor files
+.idea/
+.vscode/
+*.tmp
+*.log
+
+# OS metadata
+Thumbs.db
+Desktop.ini

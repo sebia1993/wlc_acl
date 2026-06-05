@@ -1,0 +1,3 @@
+name,host,protocol,port,device_type,username_env,password_env,enable_password_env
+inside-wlc,192.0.2.10,ssh,22,aruba_os,WLC_INSIDE_USERNAME,WLC_INSIDE_PASSWORD,
+outside-wlc,192.0.2.20,telnet,23,generic_telnet,WLC_OUTSIDE_USERNAME,WLC_OUTSIDE_PASSWORD,

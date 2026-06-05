@@ -1,0 +1,72 @@
+(sample-wlc) [mynode] #show configuration effective
+ap-group "HQ-AP"
+    virtual-ap "corp-vap"
+    virtual-ap "guest-vap"
+!
+wlan virtual-ap "corp-vap"
+    ssid-profile "corp-ssid-profile"
+    aaa-profile "corp-aaa"
+    vlan 20
+    forward-mode tunnel
+!
+wlan virtual-ap "guest-vap"
+    ssid-profile "guest-ssid-profile"
+    aaa-profile "guest-aaa"
+    vlan 30
+    forward-mode tunnel
+!
+wlan ssid-profile "corp-ssid-profile"
+    essid "CORP"
+    opmode wpa2-aes
+!
+wlan ssid-profile "guest-ssid-profile"
+    essid "GUEST"
+    opmode opensystem
+!
+aaa profile "corp-aaa"
+    initial-role "logon"
+    dot1x-default-role "corp-employee"
+    dot1x-server-group "CPPM-CORP"
+!
+aaa profile "guest-aaa"
+    initial-role "guest-logon"
+    mac-default-role "guest-logon"
+    mac-server-group "CPPM-GUEST"
+!
+user-role "logon"
+    access-list session "logon-control"
+!
+user-role "corp-employee"
+    access-list session "corp-acl" position 1
+    vlan 40
+!
+user-role "guest-logon"
+    access-list session "guest-logon-acl"
+!
+interface vlan 30
+    ip address 10.30.0.1 255.255.255.0
+!
+interface vlan 40
+    ip address 10.40.0.254 255.255.255.0
+!
+ip access-list session "logon-control"
+    any any svc-dhcp permit
+    any any svc-dns permit
+!
+ip access-list session "corp-acl"
+    any network 10.0.0.0 255.0.0.0 any deny
+    any network 172.16.0.0 255.240.0.0 any deny
+    any network 192.168.0.0 255.255.0.0 any deny
+    any any svc-dns permit
+    any any any src-nat
+!
+ip access-list session "guest-logon-acl"
+    user any svc-dhcp permit
+    user any svc-dns permit
+    user alias controller svc-https dst-nat 8081
+    user any svc-http dst-nat 8080
+!
+netdestination "controller"
+    host 10.10.10.1
+    network 10.10.20.0 255.255.255.0
+!

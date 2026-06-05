@@ -1,0 +1,6 @@
+Users
+-----
+10.20.0.11 aa:bb:cc:00:00:11 corp-user-1 role logon vlan 20 essid CORP
+10.40.1.21 aa:bb:cc:00:00:21 corp-user-2 role corp-employee vlan 40 essid CORP
+10.30.0.31 aa:bb:cc:00:00:31 guest-user-1 role guest-logon vlan 30 essid GUEST
+10.30.0.32 aa:bb:cc:00:00:32 guest-user-2 role guest-logon vlan 30 essid GUEST

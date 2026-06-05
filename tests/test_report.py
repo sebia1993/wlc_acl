@@ -1,0 +1,80 @@
+from pathlib import Path
+
+from openpyxl import load_workbook
+
+from wlc_role_acl_collector.collector import collect_from_offline_raw
+from wlc_role_acl_collector.models import Controller
+from wlc_role_acl_collector.report import build_parsed_controllers, write_raw_result, write_reports
+
+
+def test_write_excel_and_html_report(tmp_path):
+    fixture_root = Path(__file__).parent / "fixtures"
+    controller = Controller(name="sample_controller", host="192.0.2.10")
+    result = collect_from_offline_raw(controller, fixture_root)
+    write_raw_result(result, tmp_path / "raw")
+    parsed = build_parsed_controllers([result])
+
+    files = write_reports(parsed_controllers=parsed, collection_results=[result], output_dir=tmp_path)
+
+    assert files["xlsx"].exists()
+    assert files["html"].exists()
+    workbook = load_workbook(files["xlsx"], read_only=True)
+    assert {
+        "Overview",
+        "SSID_Role_Map",
+        "Role_Network_Context",
+        "Role_ACL_Detail",
+        "Alias_Detail",
+        "Unresolved",
+        "Raw_Commands",
+    }.issubset(set(workbook.sheetnames))
+    acl_headers = [cell.value for cell in next(workbook["Role_ACL_Detail"].iter_rows(max_row=1))]
+    assert "source_detail" not in acl_headers
+    assert "destination_detail" not in acl_headers
+    assert "source_interpretation" in acl_headers
+    assert "destination_interpretation" in acl_headers
+    assert "role_user_network" in acl_headers
+    overview_headers = [cell.value for cell in next(workbook["Overview"].iter_rows(max_row=1))]
+    ssid_headers = [cell.value for cell in next(workbook["SSID_Role_Map"].iter_rows(max_row=1))]
+    raw_headers = [cell.value for cell in next(workbook["Raw_Commands"].iter_rows(max_row=1))]
+    for headers in (overview_headers, ssid_headers, raw_headers):
+        assert "site" not in headers
+        assert "zone" not in headers
+    assert "effective_vlan" in ssid_headers
+    assert "role_user_network" in ssid_headers
+    assert "network_evidence" in ssid_headers
+    assert "observed_user_count" in ssid_headers
+    context_headers = [cell.value for cell in next(workbook["Role_Network_Context"].iter_rows(max_row=1))]
+    assert "role_user_network" in context_headers
+    assert "observed_networks" in context_headers
+    html = files["html"].read_text(encoding="utf-8")
+    assert "CORP" in html
+    assert "<th>Zone</th>" not in html
+    assert "Role User Network" in html
+    assert "10.40.1.0/24" in html
+    assert "10.30.0.0/24" in html
+    assert "User IP (current client assigned to this role)" in html
+    assert "Any (0.0.0.0/0)" in html
+    assert "Source Detail" not in html
+    assert "Destination Detail" not in html
+    assert "Alias Detail" not in html
+    assert 'class="alias-link"' in html
+    assert 'class="alias-detail-row" hidden' in html
+    assert "<th>Comment</th>" in html
+    assert 'class="comment-input"' in html
+    assert 'class="comment-print"' in html
+    assert 'id="acl-comments-data"' in html
+    assert "주석 포함 HTML 저장" in html
+    assert "PDF 저장/인쇄" in html
+    assert "window.print()" in html
+    assert "beforeprint" in html
+    assert "@media print" in html
+    assert 'class="toolbar no-print"' in html
+    assert 'colspan="8"' in html
+    assert "alias-type-host" in html
+    assert "alias-type-network" in html
+    assert "10.10.20.0 255.255.255.0" in html
+    raw_text = result.raw_file.read_text(encoding="utf-8")
+    assert "[show user-table output redacted]" in raw_text
+    assert "corp-user-2" not in raw_text
+    assert "aa:bb:cc" not in raw_text

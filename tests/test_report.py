@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pandas as pd
 from openpyxl import load_workbook
 
 from wlc_role_acl_collector.collector import collect_from_offline_raw
@@ -7,6 +8,7 @@ from wlc_role_acl_collector.models import Controller, RoleNetworkDefinition
 from wlc_role_acl_collector.report import (
     _acl_rows_html,
     _is_role_related_acl,
+    _write_html,
     build_parsed_controllers,
     write_raw_result,
     write_reports,
@@ -212,3 +214,85 @@ def test_role_related_acl_allows_role_name_inside_acl_name():
     assert _is_role_related_acl("guest-logon", "guest-logon-acl")
     assert _is_role_related_acl("guest-logon", "branch-guest-logon-policy")
     assert not _is_role_related_acl("corp-employee", "corp-acl")
+
+
+def test_html_hides_zero_user_roles_when_user_table_is_reliable(tmp_path):
+    html_path = tmp_path / "report.html"
+    _write_html(html_path, _minimal_report_frames(user_table_success=True))
+
+    html = html_path.read_text(encoding="utf-8")
+
+    assert 'id="toggle-zero-user-roles"' in html
+    assert 'data-zero-user-role-count="1"' in html
+    assert "Show zero-user roles" in html
+    assert "Hide zero-user roles" in html
+    assert 'data-role="empty-role" data-zero-user-role="true" hidden' in html
+    assert 'class="role-tab zero-user-role"' in html
+    assert "syncZeroUserRoles" in html
+    assert "document.querySelectorAll('.zero-user-role')" in html
+
+
+def test_html_does_not_hide_zero_user_roles_when_user_table_failed(tmp_path):
+    html_path = tmp_path / "report.html"
+    _write_html(html_path, _minimal_report_frames(user_table_success=False))
+
+    html = html_path.read_text(encoding="utf-8")
+
+    assert 'id="toggle-zero-user-roles"' not in html
+    assert 'data-zero-user-role="true"' not in html
+    assert "Role user counts were not available from show user-table" in html
+
+
+def test_html_does_not_hide_roles_when_all_roles_have_zero_users(tmp_path):
+    html_path = tmp_path / "report.html"
+    _write_html(html_path, _minimal_report_frames(user_table_success=True, active_user_count=0))
+
+    html = html_path.read_text(encoding="utf-8")
+
+    assert 'id="toggle-zero-user-roles"' not in html
+    assert 'data-zero-user-role="true"' not in html
+    assert "All Roles have 0 observed users" in html
+
+
+def _minimal_report_frames(*, user_table_success: bool, active_user_count: int = 2) -> dict[str, pd.DataFrame]:
+    role_network_rows = [
+        {"role": "active-role", "observed_user_count": active_user_count},
+        {"role": "empty-role", "observed_user_count": 0},
+    ]
+    acl_rows = [
+        _acl_row("active-role", "active-role-acl", 1),
+        _acl_row("empty-role", "empty-role-acl", 1),
+    ]
+    return {
+        "Overview": pd.DataFrame(
+            [{"controller": "sample", "ssid_count": 1, "role_count": 2, "alias_count": 0, "unresolved_count": 0}]
+        ),
+        "SSID_Role_Map": pd.DataFrame(),
+        "Role_Network_Context": pd.DataFrame(role_network_rows),
+        "Local_Role_Networks": pd.DataFrame(),
+        "Role_ACL_Detail": pd.DataFrame(acl_rows),
+        "Alias_Detail": pd.DataFrame(),
+        "Unresolved": pd.DataFrame(),
+        "Raw_Commands": pd.DataFrame(
+            [{"controller": "sample", "command_id": "user_table", "command": "show user-table", "success": user_table_success}]
+        ),
+    }
+
+
+def _acl_row(role: str, acl: str, sequence: int) -> dict[str, object]:
+    return {
+        "controller": "sample",
+        "role": role,
+        "acl": acl,
+        "sequence": sequence,
+        "action": "permit",
+        "source": "user",
+        "destination": "any",
+        "source_interpretation": "User IP (current client assigned to this role)",
+        "destination_interpretation": "Any (0.0.0.0/0)",
+        "service": "any",
+        "role_user_network": "",
+        "access_summary": "",
+        "access_flags": "",
+        "raw_rule": "",
+    }

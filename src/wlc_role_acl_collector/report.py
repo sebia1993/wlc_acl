@@ -474,6 +474,8 @@ def _write_html(
     alias_lookup = _group_by_alias(alias_rows)
     local_network_lookup = _group_local_network_rows(local_network_rows)
     role_user_counts = _role_observed_user_counts(role_network_rows)
+    raw_command_rows = frames["Raw_Commands"].to_dict(orient="records")
+    user_table_counts_reliable = _user_table_counts_reliable(raw_command_rows)
     unresolved_count = len(frames["Unresolved"])
 
     cards = "\n".join(
@@ -507,10 +509,28 @@ def _write_html(
             start=1,
         )
     ]
+    zero_user_hiding_enabled = (
+        user_table_counts_reliable
+        and any(_int_value(item["user_count"]) > 0 for item in role_items)
+        and any(_int_value(item["user_count"]) == 0 for item in role_items)
+    )
+    for item in role_items:
+        item["zero_user_hidden"] = zero_user_hiding_enabled and _int_value(item["user_count"]) == 0
+    zero_user_hidden_count = sum(1 for item in role_items if item["zero_user_hidden"])
+    selected_panel_id = next(
+        (str(item["panel_id"]) for item in role_items if not item["zero_user_hidden"]),
+        str(role_items[0]["panel_id"]) if role_items else "",
+    )
+    zero_user_role_controls = _zero_user_role_controls_html(
+        enabled=zero_user_hiding_enabled,
+        hidden_count=zero_user_hidden_count,
+        user_table_counts_reliable=user_table_counts_reliable,
+        role_items=role_items,
+    )
     role_buttons = "\n".join(
         f"""
-        <button class="role-tab" type="button" role="tab" data-panel-id="{escape(str(item['panel_id']))}"
-          aria-controls="{escape(str(item['panel_id']))}" aria-selected="{'true' if index == 1 else 'false'}">
+        <button class="role-tab{_zero_user_role_class(bool(item['zero_user_hidden']))}" type="button" role="tab" data-panel-id="{escape(str(item['panel_id']))}"
+          aria-controls="{escape(str(item['panel_id']))}" aria-selected="{'true' if str(item['panel_id']) == selected_panel_id else 'false'}"{_zero_user_role_attrs(bool(item['zero_user_hidden']))}{_hidden_attr(bool(item['zero_user_hidden']))}>
           <span class="role-tab-name">{escape(str(item['role']))}</span>
           <span class="role-tab-meta">{len(item['rows'])} rules / {item['user_count']} users</span>
         </button>
@@ -519,7 +539,7 @@ def _write_html(
     )
     acl_sections = "\n".join(
         f"""
-        <section class="acl-section role-panel" id="{escape(str(item['panel_id']))}" data-role="{escape(str(item['role']))}" {'hidden' if index != 1 else ''}>
+        <section class="acl-section role-panel{_zero_user_role_class(bool(item['zero_user_hidden']))}" id="{escape(str(item['panel_id']))}" data-role="{escape(str(item['role']))}"{_zero_user_role_attrs(bool(item['zero_user_hidden']))}{_hidden_attr(bool(item['zero_user_hidden']) or str(item['panel_id']) != selected_panel_id)}>
           <div class="acl-section-header">
             <h3>{escape(str(item['role']))}</h3>
             <span>{len(item['rows'])} rules / {item['user_count']} observed users{_other_acl_meta_text(int(item['other_acl_count']))}</span>
@@ -620,6 +640,22 @@ def _write_html(
     }}
     .role-tab-name {{ font-size: 13px; }}
     .role-tab-meta {{ color: var(--muted); font-size: 11px; font-weight: 400; }}
+    .zero-user-role[hidden] {{ display: none; }}
+    .zero-user-role-controls {{
+      align-items: center;
+      display: flex;
+      gap: 8px;
+      margin: 6px 0 10px;
+    }}
+    .zero-user-role-notice {{
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-radius: 6px;
+      color: #9a3412;
+      font-size: 12px;
+      margin: 6px 0 10px;
+      padding: 8px 10px;
+    }}
     .local-network {{
       background: #f8fafc;
       border-top: 1px solid var(--line);
@@ -807,6 +843,7 @@ def _write_html(
       <button id="toggle-raw" class="report-action secondary" type="button" aria-pressed="false">Raw 보기</button>
     </div>
     <h2>Role ACL Detail</h2>
+    {zero_user_role_controls}
     <div class="role-tabs no-print" role="tablist" aria-label="Role ACL list">
       {role_buttons}
     </div>
@@ -817,8 +854,9 @@ def _write_html(
     const roleTabs = Array.from(document.querySelectorAll('.role-tab'));
     const rolePanels = Array.from(document.querySelectorAll('.role-panel'));
     const rawToggleButton = document.querySelector('#toggle-raw');
+    const zeroUserToggleButton = document.querySelector('#toggle-zero-user-roles');
     const otherAclToggles = Array.from(document.querySelectorAll('.toggle-other-acls'));
-    let selectedRolePanelId = roleTabs.find((button) => button.getAttribute('aria-selected') === 'true')?.dataset.panelId || roleTabs[0]?.dataset.panelId || '';
+    let selectedRolePanelId = roleTabs.find((button) => button.getAttribute('aria-selected') === 'true' && !button.hidden)?.dataset.panelId || roleTabs.find((button) => !button.hidden)?.dataset.panelId || roleTabs[0]?.dataset.panelId || '';
 
     function syncRawToggleButton() {{
       if (!rawToggleButton) {{
@@ -835,6 +873,50 @@ def _write_html(
         syncRawToggleButton();
       }});
       syncRawToggleButton();
+    }}
+
+    function zeroUserRolesVisible() {{
+      return !zeroUserToggleButton || zeroUserToggleButton.getAttribute('aria-pressed') === 'true';
+    }}
+
+    function firstVisibleRolePanelId() {{
+      return roleTabs.find((button) => !button.hidden)?.dataset.panelId || roleTabs[0]?.dataset.panelId || '';
+    }}
+
+    function rolePanelIsAvailable(panelId) {{
+      const button = roleTabs.find((item) => item.dataset.panelId === panelId);
+      return Boolean(button && !button.hidden);
+    }}
+
+    function syncZeroUserToggleButton() {{
+      if (!zeroUserToggleButton) {{
+        return;
+      }}
+      const count = zeroUserToggleButton.dataset.zeroUserRoleCount || '0';
+      const visible = zeroUserRolesVisible();
+      zeroUserToggleButton.textContent = visible ? `Hide zero-user roles (${{count}})` : `Show zero-user roles (${{count}})`;
+      zeroUserToggleButton.setAttribute('aria-pressed', String(visible));
+    }}
+
+    function syncZeroUserRoles() {{
+      const visible = zeroUserRolesVisible();
+      for (const item of document.querySelectorAll('.zero-user-role')) {{
+        item.hidden = !visible;
+      }}
+      if (!rolePanelIsAvailable(selectedRolePanelId)) {{
+        selectedRolePanelId = firstVisibleRolePanelId();
+      }}
+      if (selectedRolePanelId) {{
+        selectRolePanel(selectedRolePanelId);
+      }}
+      syncZeroUserToggleButton();
+    }}
+
+    if (zeroUserToggleButton) {{
+      zeroUserToggleButton.addEventListener('click', () => {{
+        zeroUserToggleButton.setAttribute('aria-pressed', String(!zeroUserRolesVisible()));
+        syncZeroUserRoles();
+      }});
     }}
 
     function syncOtherAclButton(button) {{
@@ -874,9 +956,10 @@ def _write_html(
     }}
 
     function selectRolePanel(panelId) {{
-      selectedRolePanelId = panelId || selectedRolePanelId;
+      selectedRolePanelId = rolePanelIsAvailable(panelId) ? panelId : firstVisibleRolePanelId();
       for (const panel of rolePanels) {{
-        panel.hidden = panel.id !== selectedRolePanelId;
+        const available = !panel.classList.contains('zero-user-role') || zeroUserRolesVisible();
+        panel.hidden = !available || panel.id !== selectedRolePanelId;
       }}
       for (const button of roleTabs) {{
         button.setAttribute('aria-selected', String(button.dataset.panelId === selectedRolePanelId));
@@ -888,9 +971,7 @@ def _write_html(
         selectRolePanel(button.dataset.panelId);
       }});
     }}
-    if (selectedRolePanelId) {{
-      selectRolePanel(selectedRolePanelId);
-    }}
+    syncZeroUserRoles();
 
     for (const button of document.querySelectorAll('.alias-link')) {{
       button.addEventListener('click', () => {{
@@ -987,6 +1068,9 @@ def _write_html(
       for (const panel of rolePanels) {{
         panel.hidden = false;
       }}
+      for (const item of document.querySelectorAll('.zero-user-role')) {{
+        item.hidden = false;
+      }}
       for (const row of document.querySelectorAll('.other-acl-rule')) {{
         row.hidden = false;
       }}
@@ -999,9 +1083,7 @@ def _write_html(
     }}
 
     function restoreScreenView() {{
-      if (selectedRolePanelId) {{
-        selectRolePanel(selectedRolePanelId);
-      }}
+      syncZeroUserRoles();
       for (const button of otherAclToggles) {{
         syncOtherAclRows(button);
       }}
@@ -1194,6 +1276,45 @@ def _alias_type_class(entry_type: str) -> str:
     return "raw"
 
 
+def _zero_user_role_controls_html(
+    *,
+    enabled: bool,
+    hidden_count: int,
+    user_table_counts_reliable: bool,
+    role_items: list[dict[str, Any]],
+) -> str:
+    if enabled and hidden_count > 0:
+        return f"""
+        <div class="zero-user-role-controls no-print">
+          <button id="toggle-zero-user-roles" class="report-action secondary" type="button"
+            data-zero-user-role-count="{hidden_count}" aria-pressed="false">
+            Show zero-user roles ({hidden_count})
+          </button>
+        </div>
+        """
+    if role_items and not user_table_counts_reliable:
+        return """
+        <p class="zero-user-role-notice">Role user counts were not available from show user-table, so zero-user Role hiding is disabled.</p>
+        """
+    if role_items and all(_int_value(item.get("user_count")) == 0 for item in role_items):
+        return """
+        <p class="zero-user-role-notice">All Roles have 0 observed users, so zero-user Role hiding is disabled to avoid an empty report.</p>
+        """
+    return ""
+
+
+def _zero_user_role_class(hidden: bool) -> str:
+    return " zero-user-role" if hidden else ""
+
+
+def _zero_user_role_attrs(hidden: bool) -> str:
+    return ' data-zero-user-role="true"' if hidden else ""
+
+
+def _hidden_attr(hidden: bool) -> str:
+    return " hidden" if hidden else ""
+
+
 def _local_role_network_html(rows: list[dict[str, Any]], enabled: bool) -> str:
     if not enabled:
         return ""
@@ -1272,6 +1393,21 @@ def _role_observed_user_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
             continue
         counts[role] = max(counts.get(role, 0), _int_value(row.get("observed_user_count", 0)))
     return counts
+
+
+def _user_table_counts_reliable(rows: list[dict[str, Any]]) -> bool:
+    user_table_rows = [
+        row for row in rows if str(row.get("command_id", "")).strip() == "user_table"
+    ]
+    return bool(user_table_rows) and all(_bool_value(row.get("success")) for row in user_table_rows)
+
+
+def _bool_value(value: Any) -> bool:
+    if value is True:
+        return True
+    if value is False or value is None:
+        return False
+    return str(value).strip().casefold() in {"true", "1", "yes", "y"}
 
 
 def _other_acl_row_count(role: str, rows: list[dict[str, Any]]) -> int:

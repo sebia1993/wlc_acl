@@ -86,15 +86,27 @@ def write_reports(
     collection_results: list[CollectionResult],
     output_dir: Path,
     local_role_networks: list[RoleNetworkDefinition] | None = None,
+    export_local_role_networks: bool = False,
+    access_history_enabled: bool = False,
 ) -> dict[str, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     workbook_path = output_dir / "ssid_role_acl_report.xlsx"
     html_path = output_dir / "ssid_role_acl_report.html"
 
     local_role_networks = local_role_networks or []
-    frames = _build_frames(parsed_controllers, collection_results, local_role_networks)
+    frames = _build_frames(
+        parsed_controllers,
+        collection_results,
+        local_role_networks,
+        export_local_role_networks=export_local_role_networks,
+    )
     _write_excel(workbook_path, frames)
-    _write_html(html_path, frames, local_role_networks_enabled=bool(local_role_networks))
+    _write_html(
+        html_path,
+        frames,
+        local_role_networks_enabled=bool(local_role_networks) and export_local_role_networks,
+        access_history_enabled=access_history_enabled,
+    )
     return {"xlsx": workbook_path, "html": html_path}
 
 
@@ -102,10 +114,12 @@ def _build_frames(
     parsed_controllers: list[ParsedController],
     collection_results: list[CollectionResult],
     local_role_networks: list[RoleNetworkDefinition] | None = None,
+    *,
+    export_local_role_networks: bool = False,
 ) -> dict[str, pd.DataFrame]:
     local_role_networks = local_role_networks or []
-    local_lookup = _group_local_role_networks(local_role_networks)
-    local_mapping_enabled = bool(local_role_networks)
+    local_mapping_enabled = bool(local_role_networks) and export_local_role_networks
+    local_lookup = _group_local_role_networks(local_role_networks) if local_mapping_enabled else {}
     ssid_rows: list[dict[str, Any]] = []
     role_network_rows: list[dict[str, Any]] = []
     local_network_rows: list[dict[str, Any]] = []
@@ -140,88 +154,100 @@ def _build_frames(
             )
         for mapping in parsed.ssid_role_mappings:
             local_status = local_status_by_role.get(mapping.role, _empty_local_network_status())
-            ssid_rows.append(
-                {
-                    "controller": mapping.controller,
-                    "ssid": mapping.ssid,
-                    "ap_group": mapping.ap_group,
-                    "virtual_ap": mapping.virtual_ap,
-                    "ssid_profile": mapping.ssid_profile,
-                    "aaa_profile": mapping.aaa_profile,
-                    "role_type": mapping.role_type,
-                    "role": mapping.role,
-                    "vlan": mapping.vlan,
-                    "effective_vlan": mapping.effective_vlan,
-                    "role_user_network": mapping.role_user_network,
-                    "network_evidence": mapping.network_evidence,
-                    "network_confidence": mapping.network_confidence,
-                    "assignment_source": mapping.assignment_source,
-                    "configured_vlan": mapping.configured_vlan,
-                    "configured_subnet": mapping.configured_subnet,
-                    "local_role_networks": local_status["networks"],
-                    "local_network_status": local_status["status"],
-                    "local_network_notes": local_status["notes"],
-                    "observed_user_count": mapping.observed_user_count,
-                    "forward_mode": mapping.forward_mode,
-                    "access_summary": mapping.access_summary,
-                    "dynamic_role_possible": mapping.dynamic_role_possible,
-                    "dynamic_role_reason": mapping.dynamic_role_reason,
-                }
-            )
+            ssid_row = {
+                "controller": mapping.controller,
+                "ssid": mapping.ssid,
+                "ap_group": mapping.ap_group,
+                "virtual_ap": mapping.virtual_ap,
+                "ssid_profile": mapping.ssid_profile,
+                "aaa_profile": mapping.aaa_profile,
+                "role_type": mapping.role_type,
+                "role": mapping.role,
+                "vlan": mapping.vlan,
+                "effective_vlan": mapping.effective_vlan,
+                "role_user_network": mapping.role_user_network,
+                "network_evidence": mapping.network_evidence,
+                "network_confidence": mapping.network_confidence,
+                "assignment_source": mapping.assignment_source,
+                "configured_vlan": mapping.configured_vlan,
+                "configured_subnet": mapping.configured_subnet,
+                "observed_user_count": mapping.observed_user_count,
+                "forward_mode": mapping.forward_mode,
+                "access_summary": mapping.access_summary,
+                "dynamic_role_possible": mapping.dynamic_role_possible,
+                "dynamic_role_reason": mapping.dynamic_role_reason,
+            }
+            if local_mapping_enabled:
+                ssid_row.update(
+                    {
+                        "local_role_networks": local_status["networks"],
+                        "local_network_status": local_status["status"],
+                        "local_network_notes": local_status["notes"],
+                    }
+                )
+            ssid_rows.append(ssid_row)
         for policy in parsed.role_policies.values():
             local_status = local_status_by_role.get(policy.role, _empty_local_network_status())
             if not policy.rules:
-                acl_rows.append(
-                    {
-                        "controller": policy.controller,
-                        "role": policy.role,
-                        "acl": ", ".join(policy.acl_names),
-                        "sequence": "",
-                        "action": "",
-                        "source": "",
-                        "destination": "",
-                        "source_interpretation": "",
-                        "destination_interpretation": "",
-                        "service": "",
-                        "role_user_network": _role_network_summary(parsed, policy.role),
-                        "local_role_networks": local_status["networks"],
-                        "local_network_status": local_status["status"],
-                        "local_network_notes": local_status["notes"],
-                        "access_summary": policy.access_summary,
-                        "access_flags": ", ".join(policy.access_flags),
-                        "raw_rule": "",
-                    }
-                )
+                acl_row = {
+                    "controller": policy.controller,
+                    "role": policy.role,
+                    "acl": ", ".join(policy.acl_names),
+                    "sequence": "",
+                    "action": "",
+                    "source": "",
+                    "destination": "",
+                    "source_interpretation": "",
+                    "destination_interpretation": "",
+                    "service": "",
+                    "role_user_network": _role_network_summary(parsed, policy.role),
+                    "access_summary": policy.access_summary,
+                    "access_flags": ", ".join(policy.access_flags),
+                    "raw_rule": "",
+                }
+                if local_mapping_enabled:
+                    acl_row.update(
+                        {
+                            "local_role_networks": local_status["networks"],
+                            "local_network_status": local_status["status"],
+                            "local_network_notes": local_status["notes"],
+                        }
+                    )
+                acl_rows.append(acl_row)
             for rule in policy.rules:
-                acl_rows.append(
-                    {
-                        "controller": policy.controller,
-                        "role": policy.role,
-                        "acl": rule.acl,
-                        "sequence": rule.sequence,
-                        "action": rule.action,
-                        "source": rule.source,
-                        "destination": rule.destination,
-                        "source_interpretation": _acl_field_interpretation(
-                            rule.source,
-                            local_networks=local_status["networks"],
-                            local_mapping_enabled=local_mapping_enabled,
-                        ),
-                        "destination_interpretation": _acl_field_interpretation(
-                            rule.destination,
-                            local_networks=local_status["networks"],
-                            local_mapping_enabled=local_mapping_enabled,
-                        ),
-                        "service": rule.service,
-                        "role_user_network": _role_network_summary(parsed, policy.role),
-                        "local_role_networks": local_status["networks"],
-                        "local_network_status": local_status["status"],
-                        "local_network_notes": local_status["notes"],
-                        "access_summary": policy.access_summary,
-                        "access_flags": ", ".join(policy.access_flags),
-                        "raw_rule": rule.raw,
-                    }
-                )
+                acl_row = {
+                    "controller": policy.controller,
+                    "role": policy.role,
+                    "acl": rule.acl,
+                    "sequence": rule.sequence,
+                    "action": rule.action,
+                    "source": rule.source,
+                    "destination": rule.destination,
+                    "source_interpretation": _acl_field_interpretation(
+                        rule.source,
+                        local_networks=local_status["networks"],
+                        local_mapping_enabled=local_mapping_enabled,
+                    ),
+                    "destination_interpretation": _acl_field_interpretation(
+                        rule.destination,
+                        local_networks=local_status["networks"],
+                        local_mapping_enabled=local_mapping_enabled,
+                    ),
+                    "service": rule.service,
+                    "role_user_network": _role_network_summary(parsed, policy.role),
+                    "access_summary": policy.access_summary,
+                    "access_flags": ", ".join(policy.access_flags),
+                    "raw_rule": rule.raw,
+                }
+                if local_mapping_enabled:
+                    acl_row.update(
+                        {
+                            "local_role_networks": local_status["networks"],
+                            "local_network_status": local_status["status"],
+                            "local_network_notes": local_status["notes"],
+                        }
+                    )
+                acl_rows.append(acl_row)
         for alias, entries in sorted(parsed.netdestination_aliases.items()):
             if not entries:
                 alias_rows.append(
@@ -267,11 +293,17 @@ def _build_frames(
             }
         )
 
-    return {
+    frames = {
         "Overview": pd.DataFrame(overview_rows),
         "SSID_Role_Map": pd.DataFrame(ssid_rows),
         "Role_Network_Context": pd.DataFrame(role_network_rows),
-        "Local_Role_Networks": pd.DataFrame(
+        "Role_ACL_Detail": pd.DataFrame(acl_rows),
+        "Alias_Detail": pd.DataFrame(alias_rows),
+        "Unresolved": pd.DataFrame(unresolved_rows),
+        "Raw_Commands": pd.DataFrame(raw_rows),
+    }
+    if local_mapping_enabled:
+        frames["Local_Role_Networks"] = pd.DataFrame(
             local_network_rows,
             columns=[
                 "controller",
@@ -284,12 +316,8 @@ def _build_frames(
                 "notes",
                 "wlc_configured_subnets",
             ],
-        ),
-        "Role_ACL_Detail": pd.DataFrame(acl_rows),
-        "Alias_Detail": pd.DataFrame(alias_rows),
-        "Unresolved": pd.DataFrame(unresolved_rows),
-        "Raw_Commands": pd.DataFrame(raw_rows),
-    }
+        )
+    return frames
 
 
 def _group_local_role_networks(
@@ -467,10 +495,11 @@ def _write_html(
     frames: dict[str, pd.DataFrame],
     *,
     local_role_networks_enabled: bool = False,
+    access_history_enabled: bool = False,
 ) -> None:
     overview = frames["Overview"].to_dict(orient="records")
     role_network_rows = frames["Role_Network_Context"].to_dict(orient="records")
-    local_network_rows = frames["Local_Role_Networks"].to_dict(orient="records")
+    local_network_rows = frames.get("Local_Role_Networks", pd.DataFrame()).to_dict(orient="records")
     acl_rows = frames["Role_ACL_Detail"].to_dict(orient="records")
     alias_rows = frames["Alias_Detail"].to_dict(orient="records")
     alias_lookup = _group_by_alias(alias_rows)
@@ -529,11 +558,19 @@ def _write_html(
         user_table_counts_reliable=user_table_counts_reliable,
         role_items=role_items,
     )
-    access_check_data = build_access_check_data(role_items, alias_rows, local_network_rows)
+    access_check_data = build_access_check_data(
+        role_items,
+        alias_rows,
+        local_network_rows,
+        include_local_networks=local_role_networks_enabled,
+    )
     access_check_json = _json_for_html(access_check_data)
-    access_check_controls = _access_check_controls_html(access_check_data)
+    access_check_controls = _access_check_controls_html(
+        access_check_data,
+        history_enabled=access_history_enabled,
+    )
     access_check_css = _access_check_css()
-    access_check_script = _access_check_script()
+    access_check_script = _access_check_script(history_enabled=access_history_enabled)
     role_buttons = "\n".join(
         f"""
         <button class="role-tab{_zero_user_role_class(bool(item['zero_user_hidden']))}" type="button" role="tab" data-panel-id="{escape(str(item['panel_id']))}"
@@ -1021,7 +1058,7 @@ def _write_html(
     {acl_sections}
   </main>
   <script id="access-check-data" type="application/json">{access_check_json}</script>
-  <textarea id="access-check-history-data" hidden>[]</textarea>
+  {_access_check_history_data_html(access_history_enabled)}
   <textarea id="acl-comments-data" hidden>{{}}</textarea>
   <script>
     const roleTabs = Array.from(document.querySelectorAll('.role-tab'));
@@ -1326,7 +1363,13 @@ def _json_for_html(data: dict[str, Any]) -> str:
     )
 
 
-def _access_check_controls_html(access_check_data: dict[str, Any]) -> str:
+def _access_check_history_data_html(enabled: bool) -> str:
+    if not enabled:
+        return ""
+    return '<textarea id="access-check-history-data" hidden>[]</textarea>'
+
+
+def _access_check_controls_html(access_check_data: dict[str, Any], *, history_enabled: bool = False) -> str:
     roles = access_check_data.get("roles", [])
     role_options = "".join(
         f"""
@@ -1341,6 +1384,19 @@ def _access_check_controls_html(access_check_data: dict[str, Any]) -> str:
         for service in access_check_data.get("services", [])
     )
     disabled = " disabled" if not roles else ""
+    history_html = ""
+    if history_enabled:
+        history_html = f"""
+      <div class="access-history">
+        <div class="access-history-header">
+          <h3>Access Check History</h3>
+          <button id="clear-access-history" class="report-action secondary" type="button"{disabled}>Clear history</button>
+        </div>
+        <div id="access-check-history" class="access-history-body">
+          <span class="notice">No access check history.</span>
+        </div>
+      </div>
+        """
     return f"""
     <section class="access-check no-print" aria-label="Role access check">
       <div class="access-check-title">
@@ -1371,15 +1427,7 @@ def _access_check_controls_html(access_check_data: dict[str, Any]) -> str:
       <div id="access-check-result" class="access-check-result" data-status="empty" aria-live="polite">
         <span>No access check result.</span>
       </div>
-      <div class="access-history">
-        <div class="access-history-header">
-          <h3>Access Check History</h3>
-          <button id="clear-access-history" class="report-action secondary" type="button"{disabled}>Clear history</button>
-        </div>
-        <div id="access-check-history" class="access-history-body">
-          <span class="notice">No access check history.</span>
-        </div>
-      </div>
+      {history_html}
     </section>
     """
 
@@ -1549,7 +1597,7 @@ def _access_check_css() -> str:
     """
 
 
-def _access_check_script() -> str:
+def _access_check_script(*, history_enabled: bool = False) -> str:
     return """
     const accessCheckData = (() => {
       const dataElement = document.getElementById('access-check-data');
@@ -1571,8 +1619,9 @@ def _access_check_script() -> str:
     const accessHistoryDataElement = document.getElementById('access-check-history-data');
     const accessHistoryElement = document.getElementById('access-check-history');
     const accessClearHistoryButton = document.getElementById('clear-access-history');
-    const accessHistoryStorageKey = `wlc-role-acl-access-history:${location.pathname || document.title}`;
-    const accessHistoryStorageAvailable = (() => {
+    const accessHistoryEnabled = __ACCESS_HISTORY_ENABLED__;
+    const accessHistoryStorageKey = accessHistoryEnabled ? `wlc-role-acl-access-history:${location.pathname || document.title}` : '';
+    const accessHistoryStorageAvailable = accessHistoryEnabled && (() => {
       try {
         localStorage.setItem('wlc-role-acl-access-history-test', '1');
         localStorage.removeItem('wlc-role-acl-access-history-test');
@@ -1616,6 +1665,9 @@ def _access_check_script() -> str:
     }
 
     function accessReadEmbeddedHistory() {
+      if (!accessHistoryEnabled) {
+        return [];
+      }
       try {
         const parsed = JSON.parse(accessHistoryDataElement?.value || accessHistoryDataElement?.textContent || '[]');
         return Array.isArray(parsed) ? parsed : [];
@@ -1625,7 +1677,7 @@ def _access_check_script() -> str:
     }
 
     function accessReadStoredHistory() {
-      if (!accessHistoryStorageAvailable) {
+      if (!accessHistoryEnabled || !accessHistoryStorageAvailable) {
         return [];
       }
       try {
@@ -1637,7 +1689,7 @@ def _access_check_script() -> str:
     }
 
     function syncAccessHistoryData() {
-      if (!accessHistoryDataElement) {
+      if (!accessHistoryEnabled || !accessHistoryDataElement) {
         return;
       }
       const text = JSON.stringify(accessCheckHistory, null, 2);
@@ -1646,11 +1698,14 @@ def _access_check_script() -> str:
     }
 
     function syncAccessHistoryDomValues() {
+      if (!accessHistoryEnabled) {
+        return;
+      }
       syncAccessHistoryData();
     }
 
     function persistAccessHistory() {
-      if (!accessHistoryStorageAvailable) {
+      if (!accessHistoryEnabled || !accessHistoryStorageAvailable) {
         return;
       }
       localStorage.setItem(accessHistoryStorageKey, JSON.stringify(accessCheckHistory));
@@ -1670,6 +1725,9 @@ def _access_check_script() -> str:
     }
 
     function accessSetHistory(records) {
+      if (!accessHistoryEnabled) {
+        return;
+      }
       const deduped = [];
       const seen = new Set();
       for (const record of records || []) {
@@ -1687,6 +1745,9 @@ def _access_check_script() -> str:
     }
 
     function accessAddHistoryFromResult(result, context) {
+      if (!accessHistoryEnabled) {
+        return;
+      }
       if (!result || result.status === 'error') {
         return;
       }
@@ -1711,7 +1772,7 @@ def _access_check_script() -> str:
     }
 
     function renderAccessHistory() {
-      if (!accessHistoryElement) {
+      if (!accessHistoryEnabled || !accessHistoryElement) {
         return;
       }
       if (!accessCheckHistory.length) {
@@ -1741,6 +1802,9 @@ def _access_check_script() -> str:
     }
 
     function clearAccessHistory() {
+      if (!accessHistoryEnabled) {
+        return;
+      }
       accessCheckHistory = [];
       syncAccessHistoryData();
       if (accessHistoryStorageAvailable) {
@@ -1966,8 +2030,10 @@ def _access_check_script() -> str:
     if (accessClearHistoryButton) {
       accessClearHistoryButton.addEventListener('click', clearAccessHistory);
     }
-    accessSetHistory([...accessReadEmbeddedHistory(), ...accessReadStoredHistory()]);
-    """
+    if (accessHistoryEnabled) {
+      accessSetHistory([...accessReadEmbeddedHistory(), ...accessReadStoredHistory()]);
+    }
+    """.replace("__ACCESS_HISTORY_ENABLED__", "true" if history_enabled else "false")
 
 
 def _acl_rows_html(

@@ -27,7 +27,12 @@ def main(argv: list[str] | None = None) -> int:
         "--role-networks",
         type=Path,
         default=None,
-        help="optional local Role network mapping Excel file",
+        help="optional local Role network mapping Excel file; not exported unless explicitly enabled",
+    )
+    collect_parser.add_argument(
+        "--export-local-role-networks",
+        action="store_true",
+        help="include local Role network mapping data in generated reports",
     )
     collect_parser.add_argument(
         "--offline-raw-dir",
@@ -73,8 +78,12 @@ def _collect(args: argparse.Namespace) -> int:
         collection_results=results,
         output_dir=run_dir,
         local_role_networks=local_role_networks,
+        export_local_role_networks=args.export_local_role_networks,
+        access_history_enabled=False,
     )
     print(f"Output directory: {run_dir}")
+    if local_role_networks and not args.export_local_role_networks:
+        print("Role network Excel was loaded for this run only; local networks were not exported.")
     print(f"Excel: {files['xlsx']}")
     print(f"HTML: {files['html']}")
     return 0

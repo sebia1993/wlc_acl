@@ -171,6 +171,24 @@ git log --oneline -n 5
 .\tools\validate.ps1
 ```
 
+## Secure Role Network Handling
+
+Role network Excel files are treated as internal-only data. The default GUI and CLI behavior is secure mode:
+
+- The Excel file can be selected inside the company network for the current run.
+- Local Role network values are not exported to the generated HTML or Excel reports by default.
+- The generated HTML Access Check does not persist lookup history by default.
+- Run logs record only the number of loaded Role network rows, not the Excel file path or subnet values.
+- `outputs/`, `config/private/`, and local sensitive workbook/report name patterns are ignored by local git.
+
+If an internal-only report must include local Role network mappings, the CLI supports an explicit opt-in:
+
+```powershell
+python -m wlc_role_acl_collector collect --role-networks config\role_networks.example.xlsx --export-local-role-networks
+```
+
+Do not use the export option for files that may leave the company network.
+
 검증 스크립트는 `pytest`, Python `compileall`, HTML Access Check JavaScript 문법 검사를 순서대로 실행합니다. Node.js가 설치되어 있지 않으면 JavaScript 문법 검사는 건너뛰고 경고만 표시합니다.
 
 직전 로컬 커밋으로 되돌릴 필요가 있을 때는 먼저 `git log --oneline`으로 대상 커밋을 확인하십시오. 작업 중인 변경을 보존해야 하면 `git diff`나 별도 백업을 먼저 확인한 뒤 롤백 방식을 결정하는 것이 안전합니다.

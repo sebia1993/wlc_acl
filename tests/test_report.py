@@ -31,12 +31,12 @@ def test_write_excel_and_html_report(tmp_path):
         "Overview",
         "SSID_Role_Map",
         "Role_Network_Context",
-        "Local_Role_Networks",
         "Role_ACL_Detail",
         "Alias_Detail",
         "Unresolved",
         "Raw_Commands",
     }.issubset(set(workbook.sheetnames))
+    assert "Local_Role_Networks" not in workbook.sheetnames
     acl_headers = [cell.value for cell in next(workbook["Role_ACL_Detail"].iter_rows(max_row=1))]
     assert "source_detail" not in acl_headers
     assert "destination_detail" not in acl_headers
@@ -132,17 +132,15 @@ def test_write_excel_and_html_report(tmp_path):
     assert 'id="access-check-data" type="application/json"' in html
     assert 'id="access-check-source"' in html
     assert 'id="access-check-destination"' in html
-    assert 'id="access-check-history-data"' in html
-    assert 'id="access-check-history"' in html
-    assert 'id="clear-access-history"' in html
+    assert 'id="access-check-history-data"' not in html
+    assert 'id="access-check-history"' not in html
+    assert 'id="clear-access-history"' not in html
     assert '"sourceMatchers"' in html
     assert "runAccessCheck" in html
     assert "accessHighlightRule" in html
-    assert "accessHistoryStorageKey" in html
-    assert "accessAddHistoryFromResult" in html
+    assert "const accessHistoryEnabled = false" in html
     assert "syncAccessHistoryDomValues" in html
-    assert "clearAccessHistory" in html
-    assert "Access Check History" in html
+    assert "Access Check History" not in html
     assert 'data-rule-id="access-rule-guest-logon-1"' in html
     assert 'class="acl-filter-button toggle-other-acls"' in html
     assert 'data-other-acl-count="5"' in html
@@ -163,7 +161,7 @@ def test_write_excel_and_html_report(tmp_path):
     assert "aa:bb:cc" not in raw_text
 
 
-def test_write_report_includes_local_role_network_mapping(tmp_path):
+def test_write_report_does_not_export_local_role_network_mapping_by_default(tmp_path):
     fixture_root = Path(__file__).parent / "fixtures"
     controller = Controller(name="sample_controller", host="192.0.2.10")
     result = collect_from_offline_raw(controller, fixture_root)
@@ -190,6 +188,49 @@ def test_write_report_includes_local_role_network_mapping(tmp_path):
         collection_results=[result],
         output_dir=tmp_path,
         local_role_networks=local_role_networks,
+    )
+
+    workbook = load_workbook(files["xlsx"], read_only=True)
+    assert "Local_Role_Networks" not in workbook.sheetnames
+    acl_headers = [cell.value for cell in next(workbook["Role_ACL_Detail"].iter_rows(max_row=1))]
+    assert "local_role_networks" not in acl_headers
+    assert "local_network_status" not in acl_headers
+    assert "local_network_notes" not in acl_headers
+    html = files["html"].read_text(encoding="utf-8")
+    assert "Local Role Network" not in html
+    assert "10.30.0.0/24" not in html
+    assert "10.31.0.0/24" not in html
+    assert '"localNetworks"' not in html
+
+
+def test_write_report_exports_local_role_network_mapping_when_enabled(tmp_path):
+    fixture_root = Path(__file__).parent / "fixtures"
+    controller = Controller(name="sample_controller", host="192.0.2.10")
+    result = collect_from_offline_raw(controller, fixture_root)
+    parsed = build_parsed_controllers([result])
+    local_role_networks = [
+        RoleNetworkDefinition(
+            role="guest-logon",
+            network="10.30.0.0/24",
+            subnet_mask="255.255.255.0",
+            source_file="role_networks.xlsx",
+            source_row=2,
+        ),
+        RoleNetworkDefinition(
+            role="guest-logon",
+            network="10.31.0.0/24",
+            subnet_mask="255.255.255.0",
+            source_file="role_networks.xlsx",
+            source_row=3,
+        ),
+    ]
+
+    files = write_reports(
+        parsed_controllers=parsed,
+        collection_results=[result],
+        output_dir=tmp_path,
+        local_role_networks=local_role_networks,
+        export_local_role_networks=True,
     )
 
     workbook = load_workbook(files["xlsx"], read_only=True)

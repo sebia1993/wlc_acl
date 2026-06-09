@@ -37,6 +37,39 @@ def test_cli_collect_offline(tmp_path):
     reports = list((tmp_path / "outputs").glob("*/ssid_role_acl_report.xlsx"))
     assert len(reports) == 1
     workbook = load_workbook(reports[0], read_only=True)
+    assert "Local_Role_Networks" not in workbook.sheetnames
+
+
+def test_cli_can_explicitly_export_local_role_networks(tmp_path):
+    controllers = tmp_path / "controllers.csv"
+    controllers.write_text(
+        "name,host,protocol,port,device_type,username_env,password_env,enable_password_env\n"
+        "sample_controller,192.0.2.10,ssh,22,aruba_os,,,\n",
+        encoding="utf-8",
+    )
+    fixture_root = Path(__file__).parent / "fixtures"
+    role_networks = tmp_path / "role_networks.xlsx"
+    _write_role_networks(role_networks)
+
+    exit_code = main(
+        [
+            "collect",
+            "--controllers",
+            str(controllers),
+            "--offline-raw-dir",
+            str(fixture_root),
+            "--output-dir",
+            str(tmp_path / "outputs"),
+            "--role-networks",
+            str(role_networks),
+            "--export-local-role-networks",
+        ]
+    )
+
+    assert exit_code == 0
+    reports = list((tmp_path / "outputs").glob("*/ssid_role_acl_report.xlsx"))
+    assert len(reports) == 1
+    workbook = load_workbook(reports[0], read_only=True)
     assert "Local_Role_Networks" in workbook.sheetnames
 
 

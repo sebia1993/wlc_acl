@@ -249,7 +249,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
     def _role_networks_row(self, parent: tk.Widget) -> None:
         row = tk.Frame(parent, bg="#ffffff")
         row.pack(fill="x", pady=(0, 8))
-        tk.Label(row, text="Role network Excel", bg="#ffffff", fg="#344054", font=("Segoe UI", 9)).pack(anchor="w")
+        tk.Label(row, text="Role network Excel (session only)", bg="#ffffff", fg="#344054", font=("Segoe UI", 9)).pack(anchor="w")
         input_row = tk.Frame(row, bg="#ffffff")
         input_row.pack(fill="x", pady=(3, 0))
         ttk.Entry(input_row, textvariable=self.role_networks_path_var, width=34).pack(side="left", fill="x", expand=True)
@@ -258,7 +258,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
         )
         ttk.Label(
             row,
-            text="Optional. Columns: Role name, network, subnet mask.",
+            text="Optional. Loaded for this run only. Local networks are not exported to HTML/Excel in secure mode.",
             style="Muted.TLabel",
             wraplength=295,
         ).pack(anchor="w", pady=(3, 0))
@@ -308,7 +308,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
         self._log("Starting collection")
         self.worker = threading.Thread(
             target=self._run_collection_worker,
-            args=(target, output_dir, timeout, role_networks, role_networks_path),
+            args=(target, output_dir, timeout, role_networks),
             daemon=True,
         )
         self.worker.start()
@@ -330,7 +330,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
         except (tk.TclError, ValueError) as exc:
             raise ValueError("Timeout seconds must be a number.") from exc
 
-    def _run_collection_worker(self, target, output_dir: Path, timeout: int, role_networks, role_networks_path: str) -> None:
+    def _run_collection_worker(self, target, output_dir: Path, timeout: int, role_networks) -> None:
         run_dir = output_dir / timestamp_slug()
         log_lines = [
             "WLC Role ACL Collector run log",
@@ -340,8 +340,8 @@ class WlcRoleAclCollectorGui(tk.Tk):
             f"Port: {target.controller.port}",
             f"Timeout seconds: {timeout}",
         ]
-        if role_networks_path:
-            log_lines.append(f"Role network Excel: {role_networks_path}")
+        if role_networks:
+            log_lines.append(f"Role network Excel rows loaded for session only: {len(role_networks)}")
 
         def progress(event: str, payload: dict[str, object]) -> None:
             status, lines = format_collection_progress(event, payload)
@@ -355,7 +355,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
             self.event_queue.put(("status", f"Connecting to {target.controller.host}"))
             self.event_queue.put(("log", f"Controller: {target.controller.name} ({target.controller.protocol}:{target.controller.port})"))
             if role_networks:
-                self.event_queue.put(("log", f"Loaded local Role networks: {len(role_networks)} row(s)"))
+                self.event_queue.put(("log", f"Loaded local Role networks for this session only: {len(role_networks)} row(s)"))
             result = collect_from_controller(
                 target.controller,
                 timeout=timeout,
@@ -389,6 +389,8 @@ class WlcRoleAclCollectorGui(tk.Tk):
                 collection_results=[result],
                 output_dir=run_dir,
                 local_role_networks=role_networks,
+                export_local_role_networks=False,
+                access_history_enabled=False,
             )
             log_lines.extend(["Status: completed", f"Excel: {files['xlsx']}", f"HTML: {files['html']}"])
             _write_run_log(run_dir, log_lines)

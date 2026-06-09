@@ -17,9 +17,11 @@ def build_access_check_data(
     role_items: list[dict[str, Any]],
     alias_rows: list[dict[str, Any]],
     local_network_rows: list[dict[str, Any]],
+    *,
+    include_local_networks: bool = True,
 ) -> dict[str, Any]:
     alias_lookup = _group_alias_rows(alias_rows)
-    local_network_lookup = _group_local_network_rows(local_network_rows)
+    local_network_lookup = _group_local_network_rows(local_network_rows) if include_local_networks else {}
     services: set[str] = set()
     roles: list[dict[str, Any]] = []
 
@@ -51,16 +53,16 @@ def build_access_check_data(
                 }
             )
 
-        roles.append(
-            {
-                "role": role,
-                "userCount": _int_value(item.get("user_count")),
-                "zeroUser": bool(item.get("zero_user_hidden")),
-                "panelId": _clean(item.get("panel_id")),
-                "localNetworks": local_network_lookup.get(role.casefold(), []),
-                "rules": rules,
-            }
-        )
+        role_data = {
+            "role": role,
+            "userCount": _int_value(item.get("user_count")),
+            "zeroUser": bool(item.get("zero_user_hidden")),
+            "panelId": _clean(item.get("panel_id")),
+            "rules": rules,
+        }
+        if include_local_networks:
+            role_data["localNetworks"] = local_network_lookup.get(role.casefold(), [])
+        roles.append(role_data)
 
     return {
         "roles": roles,

@@ -14,6 +14,15 @@ dist/
 # PyInstaller artifacts
 .pyinstaller_build/
 
+# Generated and sensitive local artifacts
+outputs/
+config/private/
+*.local.xlsx
+*.sensitive.xlsx
+*_internal*.html
+*_internal*.xlsx
+*.secret.*
+
 # Virtual environments
 .venv/
 venv/

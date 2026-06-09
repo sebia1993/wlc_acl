@@ -86,6 +86,7 @@ def test_write_excel_and_html_report(tmp_path):
     assert 'class="role-tabs no-print"' in html
     assert 'class="role-tab"' in html
     assert 'role="tab"' in html
+    assert 'data-role="guest-logon" data-panel-id="role-panel-1"' in html
     assert 'id="role-panel-1" data-role="guest-logon"' in html
     assert 'aria-selected="true"' in html
     assert "afterprint" in html
@@ -138,6 +139,8 @@ def test_write_excel_and_html_report(tmp_path):
     assert '"sourceMatchers"' in html
     assert "runAccessCheck" in html
     assert "accessHighlightRule" in html
+    assert "function syncAccessRoleSelection(roleName)" in html
+    assert "syncAccessRoleSelection(selectedPanel.dataset.role || '')" in html
     assert "const accessHistoryEnabled = false" in html
     assert "syncAccessHistoryDomValues" in html
     assert "Access Check History" not in html

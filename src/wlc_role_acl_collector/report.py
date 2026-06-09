@@ -579,7 +579,7 @@ def _write_html(
     access_check_script = _access_check_script(history_enabled=access_history_enabled)
     role_buttons = "\n".join(
         f"""
-        <button class="role-tab{_zero_user_role_class(bool(item['zero_user_hidden']))}" type="button" role="tab" data-panel-id="{escape(str(item['panel_id']))}"
+        <button class="role-tab{_zero_user_role_class(bool(item['zero_user_hidden']))}" type="button" role="tab" data-role="{escape(str(item['role']))}" data-panel-id="{escape(str(item['panel_id']))}"
           aria-controls="{escape(str(item['panel_id']))}" aria-selected="{'true' if str(item['panel_id']) == selected_panel_id else 'false'}"{_zero_user_role_attrs(bool(item['zero_user_hidden']))}{_hidden_attr(bool(item['zero_user_hidden']))}>
           <span class="role-tab-name">{escape(str(item['role']))}</span>
           <span class="role-tab-meta">{len(item['rows'])} rules / {item['user_count']} users</span>
@@ -1181,6 +1181,10 @@ def _write_html(
       for (const button of roleTabs) {{
         button.setAttribute('aria-selected', String(button.dataset.panelId === selectedRolePanelId));
       }}
+      const selectedPanel = rolePanels.find((panel) => panel.id === selectedRolePanelId);
+      if (selectedPanel && typeof syncAccessRoleSelection === 'function') {{
+        syncAccessRoleSelection(selectedPanel.dataset.role || '');
+      }}
     }}
 
     for (const button of roleTabs) {{
@@ -1645,6 +1649,21 @@ def _access_check_script(*, history_enabled: bool = False) -> str:
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+    }
+
+    function syncAccessRoleSelection(roleName) {
+      const targetRole = String(roleName || '').trim().toLowerCase();
+      if (!accessRoleInput || !targetRole) {
+        return;
+      }
+      const option = Array.from(accessRoleInput.options || []).find(
+        (item) => String(item.value || '').trim().toLowerCase() === targetRole
+      );
+      if (!option || accessRoleInput.value === option.value) {
+        return;
+      }
+      accessRoleInput.value = option.value;
+      accessRoleInput.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
     function accessIpToNumber(value) {

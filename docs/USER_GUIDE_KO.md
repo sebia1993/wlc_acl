@@ -131,6 +131,8 @@ ACL 행마다 Comment 입력란이 있습니다.
 
 HTML 보고서의 Access Check 영역에서 특정 Role 기준 허용/차단 여부를 확인할 수 있습니다.
 
+Role ACL Detail에서 Role 버튼을 클릭하면 Access Check의 Role 선택값도 같은 Role로 자동 변경됩니다. Role별 ACL을 보면서 바로 출발지/목적지 IP 검사를 이어갈 때 사용합니다.
+
 입력 항목:
 
 | 항목 | 설명 |

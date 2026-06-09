@@ -173,6 +173,7 @@ Excel과 HTML 보고서를 만드는 파일입니다. 이 프로젝트에서 가
 - HTML 문자열 생성
 - Role 탭, ACL 표, Alias 상세, Comment UI 생성
 - Access Check에 필요한 JSON 생성
+- Role 탭 선택과 Access Check Role 선택값 동기화
 - 보안모드에서 민감 데이터 export 차단
 
 중요한 보안 기본값:

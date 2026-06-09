@@ -32,6 +32,11 @@
 - 결과 저장 폴더
 - 선택 사항: 사내에서만 사용하는 Role network Excel
 
+장비 접속 대상 주의:
+
+- 이 프로그램은 Mobility Master(MM)가 아니라 실제 WLC 컨트롤러에 접속해야 합니다.
+- MM IP를 입력하면 Role/ACL 수집 결과가 누락되거나 장비 명령 결과가 예상과 다를 수 있습니다.
+
 Role network Excel을 사용할 경우 첫 번째 시트에 아래 컬럼이 있어야 합니다.
 
 | 컬럼 | 예시 |
@@ -69,7 +74,7 @@ python -m wlc_role_acl_collector.gui_app
 
 | 항목 | 설명 |
 | --- | --- |
-| WLC IP/Hostname | 접속할 무선랜 컨트롤러 IP 또는 DNS 이름 |
+| WLC IP/Hostname | 접속할 실제 WLC 컨트롤러 IP 또는 DNS 이름. MM이 아님 |
 | Controller name | 비워두면 `wlc-장비IP` 형태로 자동 지정 |
 | Protocol | 기본 `ssh`, 필요 시 `telnet` 선택 |
 | Port | SSH는 기본 22, Telnet은 기본 23 |

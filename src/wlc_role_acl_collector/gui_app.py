@@ -27,6 +27,7 @@ from .role_networks import RoleNetworkDefinitionError, load_role_network_definit
 DEFAULT_WINDOW_SIZE = (1080, 720)
 MIN_WINDOW_SIZE = (760, 520)
 WINDOW_MARGIN = 48
+WLC_TARGET_NOTICE = "접속 대상은 Mobility Master(MM)가 아니라 실제 WLC 컨트롤러 IP/Hostname입니다."
 
 
 def _enable_windows_dpi_awareness() -> None:
@@ -250,6 +251,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
         form = self._scrollable_form(left)
 
         self._section_label(form, "Controller")
+        self._notice(form, WLC_TARGET_NOTICE)
         self._entry(form, "WLC IP/Hostname", self.host_var)
         self._entry(form, "Controller name", self.name_var, hint="비워두면 wlc-IP 형식으로 자동 지정됩니다.")
         self._protocol_row(form)
@@ -357,6 +359,21 @@ class WlcRoleAclCollectorGui(tk.Tk):
 
     def _section_label(self, parent: tk.Widget, text: str) -> None:
         tk.Label(parent, text=text, bg="#ffffff", fg="#0f6cbd", font=("Segoe UI Semibold", 11)).pack(anchor="w", pady=(8, 8))
+
+    def _notice(self, parent: tk.Widget, text: str) -> None:
+        frame = tk.Frame(parent, bg="#fffaeb", highlightbackground="#fedf89", highlightthickness=1)
+        frame.pack(fill="x", pady=(0, 10))
+        tk.Label(
+            frame,
+            text=text,
+            bg="#fffaeb",
+            fg="#7a2e0e",
+            font=("Segoe UI Semibold", 9),
+            justify="left",
+            wraplength=280,
+            padx=10,
+            pady=8,
+        ).pack(anchor="w", fill="x")
 
     def _entry(self, parent: tk.Widget, label: str, variable: tk.StringVar, *, show: str = "", hint: str = "") -> None:
         row = tk.Frame(parent, bg="#ffffff")

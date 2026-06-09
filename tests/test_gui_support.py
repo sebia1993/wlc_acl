@@ -1,4 +1,5 @@
 from wlc_role_acl_collector.gui_app import (
+    WLC_TARGET_NOTICE,
     _collection_failure_message,
     _constrain_window_rect,
     _write_run_log,
@@ -17,6 +18,11 @@ def test_gui_app_importable():
     import wlc_role_acl_collector.gui_app as gui_app
 
     assert callable(gui_app.main)
+
+
+def test_gui_notice_tells_user_to_connect_to_wlc_not_mm():
+    assert "Mobility Master(MM)" in WLC_TARGET_NOTICE
+    assert "WLC 컨트롤러" in WLC_TARGET_NOTICE
 
 
 def test_default_gui_output_dir_is_documents_folder():

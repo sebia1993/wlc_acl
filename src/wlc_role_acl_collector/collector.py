@@ -1,3 +1,9 @@
+"""Collect raw command output from WLC devices.
+
+This module is the live-device boundary. Code above this layer should work with
+CollectionResult objects instead of calling SSH/Telnet commands directly.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

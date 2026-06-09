@@ -1,3 +1,9 @@
+"""Windows GUI entry point for non-CLI users.
+
+The GUI collects connection details, starts the WLC collection in a background
+thread, and writes reports without storing passwords or local Role networks.
+"""
+
 from __future__ import annotations
 
 import os

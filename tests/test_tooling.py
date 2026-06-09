@@ -12,10 +12,12 @@ def test_validate_script_runs_local_checks():
     assert "Node.js was not found. Skipping JavaScript syntax check." in text
 
 
-def test_release_zip_includes_user_guide():
+def test_release_zip_includes_guides():
     script = Path(__file__).parents[1] / "build_windows_gui_exe.ps1"
 
     text = script.read_text(encoding="utf-8")
 
     assert "docs\\USER_GUIDE_KO.md" in text
+    assert "docs\\DEVELOPER_GUIDE_KO.md" in text
     assert "USER_GUIDE_KO.md" in text
+    assert "DEVELOPER_GUIDE_KO.md" in text

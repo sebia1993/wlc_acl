@@ -1,3 +1,5 @@
+"""Shared dataclasses used between collection, parsing, reporting, and tests."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

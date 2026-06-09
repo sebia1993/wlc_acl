@@ -1,3 +1,9 @@
+"""Load optional local Role-to-network Excel mappings.
+
+These mappings are treated as sensitive internal data. By default they are read
+for the current run only and are not exported into generated reports.
+"""
+
 from __future__ import annotations
 
 import ipaddress

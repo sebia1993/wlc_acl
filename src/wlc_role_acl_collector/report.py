@@ -1,3 +1,9 @@
+"""Build Excel and HTML reports from parsed controller data.
+
+This module is also where privacy-sensitive export decisions are enforced, such
+as not embedding local Role network mappings unless explicit export is enabled.
+"""
+
 from __future__ import annotations
 
 import json

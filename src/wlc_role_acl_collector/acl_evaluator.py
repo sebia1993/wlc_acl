@@ -1,3 +1,9 @@
+"""Evaluate whether a source/destination pair matches a Role ACL.
+
+The same matching rules are used by Python tests and by the generated HTML
+Access Check data so the browser report follows the server-side expectations.
+"""
+
 from __future__ import annotations
 
 import ipaddress

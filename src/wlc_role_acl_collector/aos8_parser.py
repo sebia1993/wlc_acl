@@ -1,3 +1,9 @@
+"""Parse Aruba AOS8 command output into structured report data.
+
+The parser translates raw WLC text into dataclasses such as RolePolicy,
+SsidRoleMapping, VLAN context, and netdestination alias entries.
+"""
+
 from __future__ import annotations
 
 import ipaddress

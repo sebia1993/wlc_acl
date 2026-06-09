@@ -141,3 +141,36 @@ Add another controller? [y/N]:
 ACL의 Source/Destination 값이 `user`인 경우는 해당 Role을 받은 현재 사용자 IP를 의미합니다. `any`(`0.0.0.0/0`)와 다르며, `user` 표기만으로 Role의 subnet을 알 수는 없습니다.
 
 HTML 보고서의 ACL 주석은 입력 즉시 브라우저 `localStorage`에 임시 저장됩니다. `주석 포함 HTML 저장`을 누르면 최신 주석이 포함된 독립 HTML 파일을 저장합니다. `PDF 저장/인쇄`는 브라우저 인쇄 기능을 사용하며, PDF에서는 HTML처럼 접기/펼치기 같은 인터랙션이 유지되지 않습니다.
+
+## HTML Access Check
+
+생성된 HTML 보고서의 `Access Check` 영역에서 Role, Source IP, Destination IP, Service를 입력하면 해당 Role에 연결된 ACL을 위에서부터 검사해 첫 번째 매칭 룰 기준으로 결과를 표시합니다. 장비에 다시 접속하지 않고 보고서 안에 포함된 ACL/Alias 데이터를 사용합니다.
+
+- `Allowed`: `permit` 룰에 매칭된 경우입니다.
+- `Blocked`: `deny` 룰에 매칭된 경우입니다.
+- `Allowed with NAT/Special Action`: `src-nat`, `dst-nat`, `redirect`, `route`, `tunnel`, `forward` 같은 액션에 매칭된 경우입니다.
+- `Implicit deny`: Source/Destination/Service 기준으로 매칭되는 룰이 없는 경우입니다.
+- `Conditional`: Service를 선택하지 않았고, 매칭된 ACL 룰이 `any`가 아닌 특정 service에 제한된 경우입니다. 정확한 판정에는 Service 선택이 필요합니다.
+
+Service 판정은 현재 ACL에 수집된 service token 기준입니다. 예를 들어 `svc-dns`, `svc-http`, `svc-https`, `any` 같은 값을 비교합니다. TCP/UDP 포트 번호를 직접 입력해 service object까지 정밀 해석하는 기능은 아직 포함하지 않습니다.
+
+Access Check 조회 이력은 브라우저 `localStorage`에 저장되며, `주석 포함 HTML 저장`을 누르면 저장된 HTML 안에도 함께 포함됩니다. 이력에는 Role, Source IP, Destination IP, Service, 판정 결과, 매칭 ACL 룰이 남습니다. 실제 IP가 포함될 수 있으므로 외부 공유 전에는 `Clear history`로 이력을 삭제하거나 저장 HTML 내용을 확인하십시오.
+
+## 로컬 검증과 Git 기록
+
+이 프로젝트는 GitHub 원격 저장소 없이 로컬 git만으로도 롤백 지점을 관리할 수 있습니다. 현재 상태 확인과 최근 커밋 확인은 다음 명령을 사용합니다.
+
+```powershell
+git status --short --branch
+git log --oneline -n 5
+```
+
+테스트와 기본 정적 검증은 로컬 PowerShell 스크립트로 실행합니다.
+
+```powershell
+.\tools\validate.ps1
+```
+
+검증 스크립트는 `pytest`, Python `compileall`, HTML Access Check JavaScript 문법 검사를 순서대로 실행합니다. Node.js가 설치되어 있지 않으면 JavaScript 문법 검사는 건너뛰고 경고만 표시합니다.
+
+직전 로컬 커밋으로 되돌릴 필요가 있을 때는 먼저 `git log --oneline`으로 대상 커밋을 확인하십시오. 작업 중인 변경을 보존해야 하면 `git diff`나 별도 백업을 먼저 확인한 뒤 롤백 방식을 결정하는 것이 안전합니다.

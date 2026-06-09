@@ -859,6 +859,7 @@ def _write_html(
     {acl_sections}
   </main>
   <script id="access-check-data" type="application/json">{access_check_json}</script>
+  <textarea id="access-check-history-data" hidden>[]</textarea>
   <textarea id="acl-comments-data" hidden>{{}}</textarea>
   <script>
     const roleTabs = Array.from(document.querySelectorAll('.role-tab'));
@@ -1103,6 +1104,9 @@ def _write_html(
     function saveCommentedHtml() {{
       collectComments();
       syncTextareaDomValues();
+      if (typeof syncAccessHistoryDomValues === 'function') {{
+        syncAccessHistoryDomValues();
+      }}
       const html = '<!doctype html>\\n' + document.documentElement.outerHTML;
       const blob = new Blob([html], {{ type: 'text/html;charset=utf-8' }});
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -1204,6 +1208,15 @@ def _access_check_controls_html(access_check_data: dict[str, Any]) -> str:
       </div>
       <div id="access-check-result" class="access-check-result" data-status="empty" aria-live="polite">
         <span>No access check result.</span>
+      </div>
+      <div class="access-history">
+        <div class="access-history-header">
+          <h3>Access Check History</h3>
+          <button id="clear-access-history" class="report-action secondary" type="button"{disabled}>Clear history</button>
+        </div>
+        <div id="access-check-history" class="access-history-body">
+          <span class="notice">No access check history.</span>
+        </div>
       </div>
     </section>
     """
@@ -1325,6 +1338,37 @@ def _access_check_css() -> str:
       outline: 2px solid #f79009;
       outline-offset: -2px;
     }
+    .access-history {
+      border-top: 1px solid var(--line);
+      margin-top: 12px;
+      padding-top: 12px;
+    }
+    .access-history-header {
+      align-items: center;
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .access-history-header h3 {
+      font-size: 14px;
+      margin: 0;
+    }
+    .access-history-header .report-action {
+      padding: 7px 9px;
+    }
+    .access-history-body {
+      overflow-x: auto;
+    }
+    .access-history-table th,
+    .access-history-table td {
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .access-history-table td:last-child {
+      white-space: normal;
+      min-width: 180px;
+    }
     """
 
 
@@ -1347,6 +1391,20 @@ def _access_check_script() -> str:
     const accessServiceInput = document.getElementById('access-check-service');
     const accessRunButton = document.getElementById('run-access-check');
     const accessResultElement = document.getElementById('access-check-result');
+    const accessHistoryDataElement = document.getElementById('access-check-history-data');
+    const accessHistoryElement = document.getElementById('access-check-history');
+    const accessClearHistoryButton = document.getElementById('clear-access-history');
+    const accessHistoryStorageKey = `wlc-role-acl-access-history:${location.pathname || document.title}`;
+    const accessHistoryStorageAvailable = (() => {
+      try {
+        localStorage.setItem('wlc-role-acl-access-history-test', '1');
+        localStorage.removeItem('wlc-role-acl-access-history-test');
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    })();
+    let accessCheckHistory = [];
 
     function accessEscapeHtml(value) {
       return String(value ?? '')
@@ -1378,6 +1436,140 @@ def _access_check_script() -> str:
 
     function accessUnique(values) {
       return Array.from(new Set(values.filter(Boolean)));
+    }
+
+    function accessReadEmbeddedHistory() {
+      try {
+        const parsed = JSON.parse(accessHistoryDataElement?.value || accessHistoryDataElement?.textContent || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (_error) {
+        return [];
+      }
+    }
+
+    function accessReadStoredHistory() {
+      if (!accessHistoryStorageAvailable) {
+        return [];
+      }
+      try {
+        const parsed = JSON.parse(localStorage.getItem(accessHistoryStorageKey) || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (_error) {
+        return [];
+      }
+    }
+
+    function syncAccessHistoryData() {
+      if (!accessHistoryDataElement) {
+        return;
+      }
+      const text = JSON.stringify(accessCheckHistory, null, 2);
+      accessHistoryDataElement.value = text;
+      accessHistoryDataElement.textContent = text;
+    }
+
+    function syncAccessHistoryDomValues() {
+      syncAccessHistoryData();
+    }
+
+    function persistAccessHistory() {
+      if (!accessHistoryStorageAvailable) {
+        return;
+      }
+      localStorage.setItem(accessHistoryStorageKey, JSON.stringify(accessCheckHistory));
+    }
+
+    function accessHistoryRecordKey(record) {
+      return [
+        record.timestamp,
+        record.role,
+        record.sourceIp,
+        record.destinationIp,
+        record.service,
+        record.verdict,
+        record.acl,
+        record.sequence,
+      ].join('|');
+    }
+
+    function accessSetHistory(records) {
+      const deduped = [];
+      const seen = new Set();
+      for (const record of records || []) {
+        const key = accessHistoryRecordKey(record || {});
+        if (seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        deduped.push(record);
+      }
+      accessCheckHistory = deduped.slice(0, 50);
+      syncAccessHistoryData();
+      persistAccessHistory();
+      renderAccessHistory();
+    }
+
+    function accessAddHistoryFromResult(result, context) {
+      if (!result || result.status === 'error') {
+        return;
+      }
+      const rule = result.matchedRule || {};
+      accessSetHistory([
+        {
+          timestamp: new Date().toISOString(),
+          role: context.roleName,
+          sourceIp: context.sourceText,
+          destinationIp: context.destinationText,
+          service: context.selectedService || '(not selected)',
+          verdict: result.verdict || '',
+          conditional: Boolean(result.conditional),
+          acl: rule.acl || '',
+          sequence: rule.sequence || '',
+          action: rule.action || '',
+          ruleId: rule.id || '',
+          raw: rule.raw || '',
+        },
+        ...accessCheckHistory,
+      ]);
+    }
+
+    function renderAccessHistory() {
+      if (!accessHistoryElement) {
+        return;
+      }
+      if (!accessCheckHistory.length) {
+        accessHistoryElement.innerHTML = '<span class="notice">No access check history.</span>';
+        return;
+      }
+      const rows = accessCheckHistory.map((record) => `
+        <tr>
+          <td>${accessEscapeHtml(record.timestamp || '')}</td>
+          <td>${accessEscapeHtml(record.role || '')}</td>
+          <td>${accessEscapeHtml(record.sourceIp || '')}</td>
+          <td>${accessEscapeHtml(record.destinationIp || '')}</td>
+          <td>${accessEscapeHtml(record.service || '')}</td>
+          <td>${accessEscapeHtml(record.verdict || '')}${record.conditional ? ' (Conditional)' : ''}</td>
+          <td>${accessEscapeHtml(record.acl || '')}${record.sequence ? ` #${accessEscapeHtml(record.sequence)}` : ''}</td>
+          <td>${accessEscapeHtml(record.raw || '')}</td>
+        </tr>
+      `).join('');
+      accessHistoryElement.innerHTML = `
+        <table class="access-history-table">
+          <thead>
+            <tr><th>Time</th><th>Role</th><th>Source</th><th>Destination</th><th>Service</th><th>Verdict</th><th>Rule</th><th>Raw</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    function clearAccessHistory() {
+      accessCheckHistory = [];
+      syncAccessHistoryData();
+      if (accessHistoryStorageAvailable) {
+        localStorage.removeItem(accessHistoryStorageKey);
+      }
+      renderAccessHistory();
     }
 
     function accessEndpointMatches(ipNumber, matchers, direction, sourceNumber, destinationNumber) {
@@ -1540,6 +1732,7 @@ def _access_check_script() -> str:
         return;
       }
       const selectedService = accessServiceInput?.value || '';
+      const checkContext = { roleName, sourceText, destinationText, selectedService };
       const localWarnings = accessLocalWarnings(roleData, sourceNumber, sourceText);
       let uncertainCount = 0;
       for (const rule of roleData.rules || []) {
@@ -1563,13 +1756,15 @@ def _access_check_script() -> str:
           ...serviceResult.warnings,
           ...(rule.warnings || []),
         ]);
-        accessRenderResult({
+        const result = {
           status: verdict.status,
           verdict: verdict.label,
           conditional: serviceResult.conditional,
           matchedRule: rule,
           warnings,
-        });
+        };
+        accessRenderResult(result);
+        accessAddHistoryFromResult(result, checkContext);
         accessHighlightRule(rule.id);
         return;
       }
@@ -1577,18 +1772,24 @@ def _access_check_script() -> str:
       if (uncertainCount > 0) {
         warnings.push(`${uncertainCount} rule(s) could not be fully evaluated because alias/name data is incomplete.`);
       }
-      accessRenderResult({
+      const result = {
         status: 'blocked',
         verdict: 'Implicit deny',
         conditional: false,
         matchedRule: null,
         warnings,
-      });
+      };
+      accessRenderResult(result);
+      accessAddHistoryFromResult(result, checkContext);
     }
 
     if (accessRunButton) {
       accessRunButton.addEventListener('click', runAccessCheck);
     }
+    if (accessClearHistoryButton) {
+      accessClearHistoryButton.addEventListener('click', clearAccessHistory);
+    }
+    accessSetHistory([...accessReadEmbeddedHistory(), ...accessReadStoredHistory()]);
     """
 
 

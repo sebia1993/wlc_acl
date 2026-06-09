@@ -6,6 +6,7 @@ thread, and writes reports without storing passwords or local Role networks.
 
 from __future__ import annotations
 
+import ctypes
 import os
 import queue
 import subprocess
@@ -23,17 +24,88 @@ from .report import build_parsed_controllers, timestamp_slug, write_raw_result, 
 from .role_networks import RoleNetworkDefinitionError, load_role_network_definitions
 
 
+DEFAULT_WINDOW_SIZE = (1080, 720)
+MIN_WINDOW_SIZE = (760, 520)
+WINDOW_MARGIN = 48
+
+
+def _enable_windows_dpi_awareness() -> None:
+    if sys.platform != "win32":
+        return
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    except Exception:
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
+
+
+def _window_work_area(window_id: int) -> tuple[int, int, int, int] | None:
+    if sys.platform != "win32":
+        return None
+
+    class RECT(ctypes.Structure):
+        _fields_ = [
+            ("left", ctypes.c_long),
+            ("top", ctypes.c_long),
+            ("right", ctypes.c_long),
+            ("bottom", ctypes.c_long),
+        ]
+
+    class MONITORINFO(ctypes.Structure):
+        _fields_ = [
+            ("cbSize", ctypes.c_ulong),
+            ("rcMonitor", RECT),
+            ("rcWork", RECT),
+            ("dwFlags", ctypes.c_ulong),
+        ]
+
+    monitor_default_to_nearest = 2
+    monitor = ctypes.windll.user32.MonitorFromWindow(int(window_id), monitor_default_to_nearest)
+    if not monitor:
+        return None
+    info = MONITORINFO()
+    info.cbSize = ctypes.sizeof(MONITORINFO)
+    if not ctypes.windll.user32.GetMonitorInfoW(monitor, ctypes.byref(info)):
+        return None
+    work = info.rcWork
+    return work.left, work.top, work.right, work.bottom
+
+
+def _constrain_window_rect(
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    work_area: tuple[int, int, int, int],
+    *,
+    min_size: tuple[int, int] = MIN_WINDOW_SIZE,
+) -> tuple[int, int, int, int]:
+    left, top, right, bottom = work_area
+    work_width = max(1, right - left)
+    work_height = max(1, bottom - top)
+    min_width = min(min_size[0], work_width)
+    min_height = min(min_size[1], work_height)
+    width = min(max(width, min_width), work_width)
+    height = min(max(height, min_height), work_height)
+    x = min(max(x, left), right - width)
+    y = min(max(y, top), bottom - height)
+    return x, y, width, height
+
+
 class WlcRoleAclCollectorGui(tk.Tk):
     def __init__(self) -> None:
+        _enable_windows_dpi_awareness()
         super().__init__()
         self.title("WLC Role ACL Collector")
-        self.configure(bg="#f4f7fb")
-        self.geometry("1120x760")
-        self.minsize(820, 560)
+        self.configure(bg="#eef2f6")
+        self.minsize(*MIN_WINDOW_SIZE)
 
         self.event_queue: "queue.Queue[tuple[str, object]]" = queue.Queue()
         self.worker: threading.Thread | None = None
         self.is_running = False
+        self._fit_after_id: str | None = None
         self.last_run_dir: Path | None = None
         self.last_html: Path | None = None
         self.last_xlsx: Path | None = None
@@ -48,11 +120,14 @@ class WlcRoleAclCollectorGui(tk.Tk):
         self.output_dir_var = tk.StringVar(value=str(default_gui_output_dir()))
         self.role_networks_path_var = tk.StringVar()
         self.timeout_var = tk.IntVar(value=60)
-        self.status_var = tk.StringVar(value="Ready")
+        self.status_var = tk.StringVar(value="대기 중")
 
         self._style()
+        self._set_initial_window_bounds()
         self._layout()
         self.protocol_var.trace_add("write", self._on_protocol_changed)
+        self.bind("<Configure>", self._schedule_fit_to_monitor)
+        self.after(300, self._fit_to_monitor)
         self.after(150, self._drain_events)
 
     def _style(self) -> None:
@@ -62,55 +137,112 @@ class WlcRoleAclCollectorGui(tk.Tk):
             "Accent.TButton",
             font=("Segoe UI Semibold", 10),
             foreground="#ffffff",
-            background="#0f6cbd",
+            background="#2563eb",
             borderwidth=0,
             padding=(16, 10),
         )
-        style.map("Accent.TButton", background=[("active", "#0d5ea8"), ("disabled", "#98a2b3")])
+        style.map("Accent.TButton", background=[("active", "#1d4ed8"), ("disabled", "#98a2b3")])
         style.configure(
             "Soft.TButton",
             font=("Segoe UI", 10),
-            foreground="#15324b",
-            background="#e5eef8",
+            foreground="#1f2937",
+            background="#edf2f7",
             borderwidth=0,
             padding=(14, 9),
         )
-        style.map("Soft.TButton", background=[("active", "#d7e5f4"), ("disabled", "#eef2f6")])
+        style.map("Soft.TButton", background=[("active", "#e2e8f0"), ("disabled", "#f3f4f6")])
         style.configure("TLabel", background="#ffffff", foreground="#172033", font=("Segoe UI", 10))
         style.configure("Muted.TLabel", background="#ffffff", foreground="#667085", font=("Segoe UI", 9))
-        style.configure("TEntry", padding=(8, 6))
-        style.configure("TCombobox", padding=(8, 6))
+        style.configure("TEntry", padding=(9, 7), fieldbackground="#ffffff")
+        style.configure("TCombobox", padding=(9, 7), fieldbackground="#ffffff")
+
+    def _set_initial_window_bounds(self) -> None:
+        work_area = _window_work_area(self.winfo_id())
+        if work_area is None:
+            self.geometry(f"{DEFAULT_WINDOW_SIZE[0]}x{DEFAULT_WINDOW_SIZE[1]}")
+            return
+
+        left, top, right, bottom = work_area
+        work_width = right - left
+        work_height = bottom - top
+        self.minsize(min(MIN_WINDOW_SIZE[0], work_width), min(MIN_WINDOW_SIZE[1], work_height))
+        width = min(DEFAULT_WINDOW_SIZE[0], max(min(MIN_WINDOW_SIZE[0], work_width), work_width - WINDOW_MARGIN))
+        height = min(DEFAULT_WINDOW_SIZE[1], max(min(MIN_WINDOW_SIZE[1], work_height), work_height - WINDOW_MARGIN))
+        x = left + max(0, (work_width - width) // 2)
+        y = top + max(0, (work_height - height) // 2)
+        self.geometry(f"{width}x{height}+{x}+{y}")
+        self.maxsize(work_width, work_height)
+
+    def _schedule_fit_to_monitor(self, event: tk.Event | None = None) -> None:
+        if event is not None and event.widget is not self:
+            return
+        if self._fit_after_id is not None:
+            self.after_cancel(self._fit_after_id)
+        self._fit_after_id = self.after(250, self._fit_to_monitor)
+
+    def _fit_to_monitor(self) -> None:
+        self._fit_after_id = None
+        if self.state() == "iconic":
+            return
+        work_area = _window_work_area(self.winfo_id())
+        if work_area is None:
+            return
+        left, top, right, bottom = work_area
+        work_width = right - left
+        work_height = bottom - top
+        self.minsize(min(MIN_WINDOW_SIZE[0], work_width), min(MIN_WINDOW_SIZE[1], work_height))
+        self.maxsize(work_width, work_height)
+        x, y, width, height = _constrain_window_rect(
+            self.winfo_x(),
+            self.winfo_y(),
+            self.winfo_width(),
+            self.winfo_height(),
+            work_area,
+        )
+        current = (self.winfo_x(), self.winfo_y(), self.winfo_width(), self.winfo_height())
+        if current != (x, y, width, height):
+            self.geometry(f"{width}x{height}+{x}+{y}")
 
     def _layout(self) -> None:
-        root = tk.Frame(self, bg="#f4f7fb", padx=18, pady=18)
+        root = tk.Frame(self, bg="#eef2f6", padx=16, pady=16)
         root.pack(fill="both", expand=True)
         root.grid_columnconfigure(0, weight=1)
         root.grid_rowconfigure(1, weight=1)
 
-        header = tk.Frame(root, bg="#143d66", padx=22, pady=18)
+        header = tk.Frame(root, bg="#ffffff", padx=18, pady=16, highlightbackground="#d7dee8", highlightthickness=1)
         header.grid(row=0, column=0, sticky="ew")
+        header.grid_columnconfigure(0, weight=1)
         tk.Label(
             header,
             text="WLC Role ACL Collector",
-            bg="#143d66",
-            fg="#ffffff",
-            font=("Segoe UI Semibold", 20),
+            bg="#ffffff",
+            fg="#111827",
+            font=("Segoe UI Semibold", 19),
         ).pack(anchor="w")
         tk.Label(
             header,
-            text="SSID 기본 Role과 Role별 ACL 접근 범위를 Excel/HTML 문서로 생성합니다.",
-            bg="#143d66",
-            fg="#d9e8f6",
+            text="SSID 기본 Role과 Role별 ACL 접근 범위를 수집해 Excel/HTML 보고서로 정리합니다.",
+            bg="#ffffff",
+            fg="#667085",
             font=("Segoe UI", 10),
         ).pack(anchor="w", pady=(4, 0))
+        tk.Label(
+            header,
+            text="Secure mode",
+            bg="#eaf3ff",
+            fg="#174a7c",
+            font=("Segoe UI Semibold", 9),
+            padx=10,
+            pady=5,
+        ).place(relx=1.0, rely=0.0, anchor="ne")
 
-        body = tk.Frame(root, bg="#f4f7fb")
-        body.grid(row=1, column=0, sticky="nsew", pady=(16, 0))
-        body.grid_columnconfigure(0, weight=0, minsize=350)
+        body = tk.Frame(root, bg="#eef2f6")
+        body.grid(row=1, column=0, sticky="nsew", pady=(14, 0))
+        body.grid_columnconfigure(0, weight=0, minsize=330)
         body.grid_columnconfigure(1, weight=1)
         body.grid_rowconfigure(0, weight=1)
 
-        left = tk.Frame(body, bg="#ffffff", highlightbackground="#d0d5dd", highlightthickness=1)
+        left = tk.Frame(body, bg="#ffffff", highlightbackground="#d7dee8", highlightthickness=1)
         left.grid(row=0, column=0, sticky="ns")
         left.grid_rowconfigure(0, weight=1)
         left.grid_columnconfigure(0, weight=1)
@@ -119,7 +251,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
 
         self._section_label(form, "Controller")
         self._entry(form, "WLC IP/Hostname", self.host_var)
-        self._entry(form, "Controller name", self.name_var, hint="미입력 시 wlc-IP 형식으로 자동 지정")
+        self._entry(form, "Controller name", self.name_var, hint="비워두면 wlc-IP 형식으로 자동 지정됩니다.")
         self._protocol_row(form)
 
         self._section_label(form, "Login")
@@ -131,40 +263,41 @@ class WlcRoleAclCollectorGui(tk.Tk):
         output_row = tk.Frame(form, bg="#ffffff")
         output_row.pack(fill="x", pady=(4, 8))
         ttk.Entry(output_row, textvariable=self.output_dir_var, width=34).pack(side="left", fill="x", expand=True)
-        ttk.Button(output_row, text="Browse", style="Soft.TButton", command=self._browse_output).pack(
+        ttk.Button(output_row, text="찾기", style="Soft.TButton", command=self._browse_output).pack(
             side="left", padx=(8, 0)
         )
         self._role_networks_row(form)
         self._timeout_row(form)
 
-        right = tk.Frame(body, bg="#f4f7fb")
-        right.grid(row=0, column=1, sticky="nsew", padx=(16, 0))
+        right = tk.Frame(body, bg="#eef2f6")
+        right.grid(row=0, column=1, sticky="nsew", padx=(14, 0))
         right.grid_columnconfigure(0, weight=1)
         right.grid_rowconfigure(1, weight=1)
 
-        status_panel = tk.Frame(right, bg="#ffffff", padx=16, pady=14, highlightbackground="#d0d5dd", highlightthickness=1)
+        status_panel = tk.Frame(right, bg="#ffffff", padx=16, pady=14, highlightbackground="#d7dee8", highlightthickness=1)
         status_panel.grid(row=0, column=0, sticky="ew")
+        tk.Label(status_panel, text="진행 상태", bg="#ffffff", fg="#667085", font=("Segoe UI Semibold", 9)).pack(anchor="w")
         tk.Label(status_panel, textvariable=self.status_var, bg="#ffffff", fg="#172033", font=("Segoe UI Semibold", 11)).pack(
-            anchor="w"
+            anchor="w", pady=(3, 0)
         )
         self.progress = ttk.Progressbar(status_panel, mode="indeterminate")
         self.progress.pack(fill="x", pady=(10, 0))
         self._action_panel(status_panel)
 
-        log_panel = tk.Frame(right, bg="#ffffff", padx=12, pady=12, highlightbackground="#d0d5dd", highlightthickness=1)
-        log_panel.grid(row=1, column=0, sticky="nsew", pady=(14, 0))
+        log_panel = tk.Frame(right, bg="#ffffff", padx=12, pady=12, highlightbackground="#d7dee8", highlightthickness=1)
+        log_panel.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
         log_panel.grid_columnconfigure(0, weight=1)
         log_panel.grid_rowconfigure(1, weight=1)
         top = tk.Frame(log_panel, bg="#ffffff")
         top.grid(row=0, column=0, sticky="ew")
-        tk.Label(top, text="Run Log", bg="#ffffff", fg="#172033", font=("Segoe UI Semibold", 11)).pack(side="left")
-        ttk.Button(top, text="Clear", style="Soft.TButton", command=self._clear_log).pack(side="right")
+        tk.Label(top, text="수집 로그", bg="#ffffff", fg="#172033", font=("Segoe UI Semibold", 11)).pack(side="left")
+        ttk.Button(top, text="지우기", style="Soft.TButton", command=self._clear_log).pack(side="right")
         self.log_text = tk.Text(
             log_panel,
             height=20,
             wrap="word",
-            bg="#0f1720",
-            fg="#d7e2ef",
+            bg="#111827",
+            fg="#dbeafe",
             insertbackground="#ffffff",
             relief="flat",
             padx=10,
@@ -192,16 +325,16 @@ class WlcRoleAclCollectorGui(tk.Tk):
         )
         self.open_folder_button.grid(row=0, column=0, sticky="ew", padx=(0, 6))
         self.open_html_button = ttk.Button(
-            outputs, text="HTML", style="Soft.TButton", command=self._open_html, state="disabled"
+            outputs, text="HTML 열기", style="Soft.TButton", command=self._open_html, state="disabled"
         )
         self.open_html_button.grid(row=0, column=1, sticky="ew", padx=6)
         self.open_xlsx_button = ttk.Button(
-            outputs, text="Excel", style="Soft.TButton", command=self._open_xlsx, state="disabled"
+            outputs, text="Excel 열기", style="Soft.TButton", command=self._open_xlsx, state="disabled"
         )
         self.open_xlsx_button.grid(row=0, column=2, sticky="ew", padx=(6, 0))
 
     def _scrollable_form(self, parent: tk.Widget) -> tk.Frame:
-        canvas = tk.Canvas(parent, bg="#ffffff", highlightthickness=0, width=348)
+        canvas = tk.Canvas(parent, bg="#ffffff", highlightthickness=0, width=328)
         scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
         canvas.configure(yscrollcommand=scrollbar.set)
         canvas.grid(row=0, column=0, sticky="nsew")
@@ -259,12 +392,12 @@ class WlcRoleAclCollectorGui(tk.Tk):
         input_row = tk.Frame(row, bg="#ffffff")
         input_row.pack(fill="x", pady=(3, 0))
         ttk.Entry(input_row, textvariable=self.role_networks_path_var, width=34).pack(side="left", fill="x", expand=True)
-        ttk.Button(input_row, text="Browse", style="Soft.TButton", command=self._browse_role_networks).pack(
+        ttk.Button(input_row, text="찾기", style="Soft.TButton", command=self._browse_role_networks).pack(
             side="left", padx=(8, 0)
         )
         ttk.Label(
             row,
-            text="Optional. Loaded for this run only. Local networks are not exported to HTML/Excel in secure mode.",
+            text="선택 사항입니다. 실행 중에만 읽고 보안모드에서는 HTML/Excel에 저장하지 않습니다.",
             style="Muted.TLabel",
             wraplength=295,
         ).pack(anchor="w", pady=(3, 0))

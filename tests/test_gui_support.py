@@ -1,4 +1,9 @@
-from wlc_role_acl_collector.gui_app import _collection_failure_message, _write_run_log, format_collection_progress
+from wlc_role_acl_collector.gui_app import (
+    _collection_failure_message,
+    _constrain_window_rect,
+    _write_run_log,
+    format_collection_progress,
+)
 from wlc_role_acl_collector.gui_support import (
     GuiConnectionInput,
     build_target_from_gui_input,
@@ -95,6 +100,11 @@ def test_format_collection_progress_for_role_command():
 
     assert status == "Role 2/5 수집 중: corp-employee"
     assert lines == ["START: rights::corp-employee | show rights corp-employee"]
+
+
+def test_constrain_window_rect_keeps_window_inside_monitor_work_area():
+    assert _constrain_window_rect(900, 650, 1200, 900, (0, 0, 1000, 700)) == (0, 0, 1000, 700)
+    assert _constrain_window_rect(800, 650, 760, 560, (100, 100, 900, 700)) == (140, 140, 760, 560)
 
 
 def test_collection_failure_message_includes_failed_command_and_run_log(tmp_path):

@@ -123,6 +123,14 @@ def test_write_excel_and_html_report(tmp_path):
     assert "body.raw-visible .raw-column { display: table-cell; }" in html
     assert "document.body.classList.toggle('raw-visible')" in html
     assert "syncRawToggleButton" in html
+    assert 'class="access-check no-print"' in html
+    assert 'id="access-check-data" type="application/json"' in html
+    assert 'id="access-check-source"' in html
+    assert 'id="access-check-destination"' in html
+    assert '"sourceMatchers"' in html
+    assert "runAccessCheck" in html
+    assert "accessHighlightRule" in html
+    assert 'data-rule-id="access-rule-guest-logon-1"' in html
     assert 'class="acl-filter-button toggle-other-acls"' in html
     assert 'data-other-acl-count="5"' in html
     assert "5 other hidden" in html

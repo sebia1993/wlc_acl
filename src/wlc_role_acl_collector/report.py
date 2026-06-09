@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from html import escape
 from pathlib import Path
@@ -9,6 +10,7 @@ import pandas as pd
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from .acl_evaluator import access_rule_id, build_access_check_data
 from .aos8_parser import parse_controller_config
 from .models import CollectionResult, ParsedController, RoleNetworkDefinition
 
@@ -527,6 +529,11 @@ def _write_html(
         user_table_counts_reliable=user_table_counts_reliable,
         role_items=role_items,
     )
+    access_check_data = build_access_check_data(role_items, alias_rows, local_network_rows)
+    access_check_json = _json_for_html(access_check_data)
+    access_check_controls = _access_check_controls_html(access_check_data)
+    access_check_css = _access_check_css()
+    access_check_script = _access_check_script()
     role_buttons = "\n".join(
         f"""
         <button class="role-tab{_zero_user_role_class(bool(item['zero_user_hidden']))}" type="button" role="tab" data-panel-id="{escape(str(item['panel_id']))}"
@@ -808,6 +815,7 @@ def _write_html(
       color: #b42318;
     }}
     .notice {{ color: var(--muted); margin: 8px 0 0; }}
+    {access_check_css}
     @media print {{
       body {{ background: #ffffff; }}
       header, main {{ padding: 14px 18px; }}
@@ -842,6 +850,7 @@ def _write_html(
       <button id="print-pdf" class="report-action secondary" type="button">PDF 저장/인쇄</button>
       <button id="toggle-raw" class="report-action secondary" type="button" aria-pressed="false">Raw 보기</button>
     </div>
+    {access_check_controls}
     <h2>Role ACL Detail</h2>
     {zero_user_role_controls}
     <div class="role-tabs no-print" role="tablist" aria-label="Role ACL list">
@@ -849,6 +858,7 @@ def _write_html(
     </div>
     {acl_sections}
   </main>
+  <script id="access-check-data" type="application/json">{access_check_json}</script>
   <textarea id="acl-comments-data" hidden>{{}}</textarea>
   <script>
     const roleTabs = Array.from(document.querySelectorAll('.role-tab'));
@@ -857,6 +867,7 @@ def _write_html(
     const zeroUserToggleButton = document.querySelector('#toggle-zero-user-roles');
     const otherAclToggles = Array.from(document.querySelectorAll('.toggle-other-acls'));
     let selectedRolePanelId = roleTabs.find((button) => button.getAttribute('aria-selected') === 'true' && !button.hidden)?.dataset.panelId || roleTabs.find((button) => !button.hidden)?.dataset.panelId || roleTabs[0]?.dataset.panelId || '';
+    {access_check_script}
 
     function syncRawToggleButton() {{
       if (!rawToggleButton) {{
@@ -1140,6 +1151,447 @@ def _write_html(
     path.write_text(html, encoding="utf-8")
 
 
+def _json_for_html(data: dict[str, Any]) -> str:
+    return (
+        json.dumps(data, ensure_ascii=False)
+        .replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+    )
+
+
+def _access_check_controls_html(access_check_data: dict[str, Any]) -> str:
+    roles = access_check_data.get("roles", [])
+    role_options = "".join(
+        f"""
+        <option value="{escape(str(role.get('role', '')))}">
+          {escape(str(role.get('role', '')))} ({escape(str(role.get('userCount', 0)))} users)
+        </option>
+        """
+        for role in roles
+    )
+    service_options = "".join(
+        f'<option value="{escape(str(service))}">{escape(str(service))}</option>'
+        for service in access_check_data.get("services", [])
+    )
+    disabled = " disabled" if not roles else ""
+    return f"""
+    <section class="access-check no-print" aria-label="Role access check">
+      <div class="access-check-title">
+        <h2>Access Check</h2>
+      </div>
+      <div class="access-check-grid">
+        <label class="access-field">
+          <span>Role</span>
+          <select id="access-check-role"{disabled}>{role_options}</select>
+        </label>
+        <label class="access-field">
+          <span>Source IP</span>
+          <input id="access-check-source" type="text" inputmode="decimal" placeholder="10.10.10.10"{disabled}>
+        </label>
+        <label class="access-field">
+          <span>Destination IP</span>
+          <input id="access-check-destination" type="text" inputmode="decimal" placeholder="10.20.20.20"{disabled}>
+        </label>
+        <label class="access-field">
+          <span>Service</span>
+          <select id="access-check-service"{disabled}>
+            <option value="">No service selected</option>
+            {service_options}
+          </select>
+        </label>
+        <button id="run-access-check" class="report-action access-run" type="button"{disabled}>Check</button>
+      </div>
+      <div id="access-check-result" class="access-check-result" data-status="empty" aria-live="polite">
+        <span>No access check result.</span>
+      </div>
+    </section>
+    """
+
+
+def _access_check_css() -> str:
+    return """
+    .access-check {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin: 18px 0;
+      padding: 14px;
+    }
+    .access-check-title {
+      align-items: center;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .access-check-title h2 {
+      font-size: 18px;
+      margin: 0;
+    }
+    .access-check-grid {
+      align-items: end;
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    }
+    .access-field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      min-width: 0;
+    }
+    .access-field span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .access-field input,
+    .access-field select {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--text);
+      font: inherit;
+      min-height: 38px;
+      padding: 8px 10px;
+      width: 100%;
+    }
+    .access-run {
+      min-height: 38px;
+      width: 100%;
+    }
+    .access-check-result {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin-top: 12px;
+      padding: 10px 12px;
+    }
+    .access-check-result[data-status="empty"] {
+      color: var(--muted);
+    }
+    .access-check-result[data-status="allowed"] {
+      background: #ecfdf3;
+      border-color: #abefc6;
+    }
+    .access-check-result[data-status="blocked"] {
+      background: #fef3f2;
+      border-color: #fecdca;
+    }
+    .access-check-result[data-status="special"],
+    .access-check-result[data-status="unknown"] {
+      background: #fffaeb;
+      border-color: #fedf89;
+    }
+    .access-check-result[data-status="error"] {
+      background: #fef3f2;
+      border-color: #fecdca;
+      color: #b42318;
+    }
+    .access-result-title {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .access-conditional {
+      background: #f79009;
+      border-radius: 999px;
+      color: #ffffff;
+      font-size: 11px;
+      padding: 2px 7px;
+    }
+    .access-result-meta {
+      display: grid;
+      gap: 5px 12px;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      margin-top: 8px;
+    }
+    .access-result-meta div {
+      min-width: 0;
+    }
+    .access-result-meta strong {
+      color: var(--muted);
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+    .access-warning-list {
+      margin: 9px 0 0;
+      padding-left: 18px;
+    }
+    .access-rule-match {
+      background: #fffbeb;
+      outline: 2px solid #f79009;
+      outline-offset: -2px;
+    }
+    """
+
+
+def _access_check_script() -> str:
+    return """
+    const accessCheckData = (() => {
+      const dataElement = document.getElementById('access-check-data');
+      if (!dataElement) {
+        return { roles: [], services: [] };
+      }
+      try {
+        return JSON.parse(dataElement.textContent || '{"roles":[],"services":[]}');
+      } catch (_error) {
+        return { roles: [], services: [] };
+      }
+    })();
+    const accessRoleInput = document.getElementById('access-check-role');
+    const accessSourceInput = document.getElementById('access-check-source');
+    const accessDestinationInput = document.getElementById('access-check-destination');
+    const accessServiceInput = document.getElementById('access-check-service');
+    const accessRunButton = document.getElementById('run-access-check');
+    const accessResultElement = document.getElementById('access-check-result');
+
+    function accessEscapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function accessIpToNumber(value) {
+      const parts = String(value || '').trim().split('.');
+      if (parts.length !== 4) {
+        throw new Error(`Invalid IPv4 address: ${value}`);
+      }
+      let number = 0;
+      for (const part of parts) {
+        if (!/^\\d+$/.test(part)) {
+          throw new Error(`Invalid IPv4 address: ${value}`);
+        }
+        const octet = Number(part);
+        if (!Number.isInteger(octet) || octet < 0 || octet > 255) {
+          throw new Error(`Invalid IPv4 address: ${value}`);
+        }
+        number = number * 256 + octet;
+      }
+      return number;
+    }
+
+    function accessUnique(values) {
+      return Array.from(new Set(values.filter(Boolean)));
+    }
+
+    function accessEndpointMatches(ipNumber, matchers, direction, sourceNumber, destinationNumber) {
+      let matched = false;
+      let uncertain = false;
+      const warnings = [];
+      for (const matcher of matchers || []) {
+        const type = String(matcher.type || '').toLowerCase();
+        if (type === 'any') {
+          matched = true;
+        } else if (type === 'user') {
+          matched = matched || direction === 'source' || destinationNumber === sourceNumber;
+        } else if (type === 'host' || type === 'network' || type === 'range') {
+          const start = Number(matcher.start);
+          const end = Number(matcher.end);
+          if (Number.isFinite(start) && Number.isFinite(end) && start <= ipNumber && ipNumber <= end) {
+            matched = true;
+          }
+        } else {
+          uncertain = true;
+          if (matcher.warning) {
+            warnings.push(String(matcher.warning));
+          }
+        }
+      }
+      return { matched, uncertain, warnings: accessUnique(warnings) };
+    }
+
+    function accessServiceMatches(ruleService, selectedService) {
+      const normalizedRuleService = String(ruleService || 'any').trim().toLowerCase() || 'any';
+      const normalizedSelectedService = String(selectedService || '').trim().toLowerCase();
+      if (!normalizedSelectedService) {
+        if (normalizedRuleService === 'any') {
+          return { matched: true, conditional: false, warnings: [] };
+        }
+        return {
+          matched: true,
+          conditional: true,
+          warnings: [`Service was not selected; matched rule is limited to ${ruleService}.`],
+        };
+      }
+      return {
+        matched: normalizedRuleService === 'any' || normalizedRuleService === normalizedSelectedService,
+        conditional: false,
+        warnings: [],
+      };
+    }
+
+    function accessActionVerdict(action) {
+      const normalized = String(action || '').trim().toLowerCase();
+      if (normalized === 'deny') {
+        return { status: 'blocked', label: 'Blocked' };
+      }
+      if (normalized === 'permit') {
+        return { status: 'allowed', label: 'Allowed' };
+      }
+      if (['src-nat', 'dst-nat', 'redirect', 'route', 'tunnel', 'forward'].includes(normalized)) {
+        return { status: 'special', label: 'Allowed with NAT/Special Action' };
+      }
+      return { status: 'unknown', label: `Unknown action: ${action || 'not parsed'}` };
+    }
+
+    function accessLocalWarnings(roleData, sourceNumber, sourceText) {
+      const networks = roleData.localNetworks || [];
+      if (!networks.length) {
+        return [];
+      }
+      const matched = networks.some((network) => Number(network.start) <= sourceNumber && sourceNumber <= Number(network.end));
+      if (matched) {
+        return [];
+      }
+      const labels = networks.map((network) => network.network || network.label).filter(Boolean).join(', ');
+      return [`Source IP ${sourceText} is outside the local Role Network mapping: ${labels}`];
+    }
+
+    function accessClearHighlights() {
+      for (const row of document.querySelectorAll('.access-rule-match')) {
+        row.classList.remove('access-rule-match');
+      }
+    }
+
+    function accessHighlightRule(ruleId) {
+      if (!ruleId) {
+        return;
+      }
+      const row = Array.from(document.querySelectorAll('[data-rule-id]')).find((item) => item.dataset.ruleId === ruleId);
+      if (!row) {
+        return;
+      }
+      const panel = row.closest('.role-panel');
+      if (panel) {
+        if (panel.classList.contains('zero-user-role') && zeroUserToggleButton && !zeroUserRolesVisible()) {
+          zeroUserToggleButton.setAttribute('aria-pressed', 'true');
+          syncZeroUserRoles();
+        }
+        if (typeof selectRolePanel === 'function') {
+          selectRolePanel(panel.id);
+        }
+        if (row.classList.contains('other-acl-rule')) {
+          const toggle = panel.querySelector('.toggle-other-acls');
+          if (toggle) {
+            toggle.setAttribute('aria-pressed', 'true');
+            syncOtherAclRows(toggle);
+          }
+        }
+      }
+      row.classList.add('access-rule-match');
+      row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+
+    function accessRenderResult(result) {
+      if (!accessResultElement) {
+        return;
+      }
+      accessResultElement.dataset.status = result.status || 'unknown';
+      const warnings = accessUnique(result.warnings || []);
+      const warningHtml = warnings.length
+        ? `<ul class="access-warning-list">${warnings.map((warning) => `<li>${accessEscapeHtml(warning)}</li>`).join('')}</ul>`
+        : '';
+      const rule = result.matchedRule;
+      const conditional = result.conditional ? '<span class="access-conditional">Conditional</span>' : '';
+      const ruleHtml = rule
+        ? `<div class="access-result-meta">
+            <div><strong>ACL</strong>${accessEscapeHtml(rule.acl)}</div>
+            <div><strong>Sequence</strong>${accessEscapeHtml(rule.sequence)}</div>
+            <div><strong>Action</strong>${accessEscapeHtml(rule.action)}</div>
+            <div><strong>Service</strong>${accessEscapeHtml(rule.service || 'any')}</div>
+            <div><strong>Source</strong>${accessEscapeHtml(rule.source)}</div>
+            <div><strong>Destination</strong>${accessEscapeHtml(rule.destination)}</div>
+            <div><strong>Raw</strong>${accessEscapeHtml(rule.raw)}</div>
+          </div>`
+        : '<div class="access-result-meta"><div><strong>ACL</strong>No ACL rule matched.</div></div>';
+      accessResultElement.innerHTML = `
+        <div class="access-result-title">
+          <span>${accessEscapeHtml(result.verdict || '')}</span>
+          ${conditional}
+        </div>
+        ${ruleHtml}
+        ${warningHtml}
+      `;
+    }
+
+    function runAccessCheck() {
+      accessClearHighlights();
+      const roleName = accessRoleInput?.value || '';
+      const sourceText = accessSourceInput?.value || '';
+      const destinationText = accessDestinationInput?.value || '';
+      let sourceNumber;
+      let destinationNumber;
+      try {
+        sourceNumber = accessIpToNumber(sourceText);
+        destinationNumber = accessIpToNumber(destinationText);
+      } catch (error) {
+        accessRenderResult({ status: 'error', verdict: error.message, warnings: [] });
+        return;
+      }
+      const roleData = (accessCheckData.roles || []).find((role) => String(role.role || '').toLowerCase() === roleName.toLowerCase());
+      if (!roleData) {
+        accessRenderResult({ status: 'error', verdict: `Role not found: ${roleName}`, warnings: [] });
+        return;
+      }
+      const selectedService = accessServiceInput?.value || '';
+      const localWarnings = accessLocalWarnings(roleData, sourceNumber, sourceText);
+      let uncertainCount = 0;
+      for (const rule of roleData.rules || []) {
+        const sourceResult = accessEndpointMatches(sourceNumber, rule.sourceMatchers, 'source', sourceNumber, destinationNumber);
+        const destinationResult = accessEndpointMatches(destinationNumber, rule.destinationMatchers, 'destination', sourceNumber, destinationNumber);
+        if (!sourceResult.matched || !destinationResult.matched) {
+          if (sourceResult.uncertain || destinationResult.uncertain) {
+            uncertainCount += 1;
+          }
+          continue;
+        }
+        const serviceResult = accessServiceMatches(rule.service, selectedService);
+        if (!serviceResult.matched) {
+          continue;
+        }
+        const verdict = accessActionVerdict(rule.action);
+        const warnings = accessUnique([
+          ...localWarnings,
+          ...sourceResult.warnings,
+          ...destinationResult.warnings,
+          ...serviceResult.warnings,
+          ...(rule.warnings || []),
+        ]);
+        accessRenderResult({
+          status: verdict.status,
+          verdict: verdict.label,
+          conditional: serviceResult.conditional,
+          matchedRule: rule,
+          warnings,
+        });
+        accessHighlightRule(rule.id);
+        return;
+      }
+      const warnings = [...localWarnings];
+      if (uncertainCount > 0) {
+        warnings.push(`${uncertainCount} rule(s) could not be fully evaluated because alias/name data is incomplete.`);
+      }
+      accessRenderResult({
+        status: 'blocked',
+        verdict: 'Implicit deny',
+        conditional: false,
+        matchedRule: null,
+        warnings,
+      });
+    }
+
+    if (accessRunButton) {
+      accessRunButton.addEventListener('click', runAccessCheck);
+    }
+    """
+
+
 def _acl_rows_html(
     role: str,
     rows: list[dict[str, Any]],
@@ -1150,6 +1602,7 @@ def _acl_rows_html(
         is_other_acl = not _is_role_related_acl(role, str(row.get("acl", "")))
         row_class = "acl-rule-row other-acl-rule" if is_other_acl else "acl-rule-row"
         other_acl_attr = ' data-other-acl="true" hidden' if is_other_acl else ""
+        rule_id = access_rule_id(role, index)
         comment_id = f"acl-comment-{_safe_dom_id(role)}-{index}"
         detail_id = f"alias-detail-{_safe_dom_id(role)}-{index}"
         source_alias = _alias_name_from_field(str(row.get("source", "")))
@@ -1162,7 +1615,7 @@ def _acl_rows_html(
         )
         rendered.append(
             f"""
-            <tr class="{row_class}"{other_acl_attr}>
+            <tr class="{row_class}"{other_acl_attr} data-rule-id="{escape(rule_id)}">
               <td>{escape(str(row.get('acl', '')))}</td>
               <td>{escape(str(row.get('sequence', '')))}</td>
               <td>{escape(str(row.get('action', '')))}</td>

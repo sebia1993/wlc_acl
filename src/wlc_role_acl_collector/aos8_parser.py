@@ -830,10 +830,17 @@ def _best_effort_acl_fields(tokens: list[str]) -> tuple[str, str, str]:
     index = 0
     while index < len(tokens) and len(fields) < 3:
         token = tokens[index]
-        if token in {"host", "network", "alias"} and index + 1 < len(tokens):
+        normalized = token.lower()
+        if normalized in {"host", "alias"} and index + 1 < len(tokens):
             fields.append(f"{token} {tokens[index + 1]}")
             index += 2
-        elif token == "range" and index + 2 < len(tokens):
+        elif normalized == "network" and index + 2 < len(tokens) and _looks_like_network_mask(tokens[index + 2]):
+            fields.append(f"{token} {tokens[index + 1]} {tokens[index + 2]}")
+            index += 3
+        elif normalized == "network" and index + 1 < len(tokens):
+            fields.append(f"{token} {tokens[index + 1]}")
+            index += 2
+        elif normalized == "range" and index + 2 < len(tokens):
             fields.append(f"range {tokens[index + 1]} {tokens[index + 2]}")
             index += 3
         else:
@@ -842,6 +849,16 @@ def _best_effort_acl_fields(tokens: list[str]) -> tuple[str, str, str]:
     while len(fields) < 3:
         fields.append("")
     return fields[0], fields[1], " ".join([fields[2], *tokens[index:]]).strip()
+
+
+def _looks_like_network_mask(value: str) -> bool:
+    if value.isdigit():
+        return 0 <= int(value) <= 32
+    try:
+        ipaddress.IPv4Address(value)
+    except ValueError:
+        return False
+    return True
 
 
 def _expand_acl_alias_references(

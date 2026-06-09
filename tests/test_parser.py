@@ -42,6 +42,10 @@ def test_parse_ssid_role_mapping_and_acl_summary():
     assert ("GUEST", "initial", "guest-logon") in rows
     assert parsed.role_policies["corp-employee"].acl_names == ["corp-acl"]
     assert parsed.role_policies["corp-employee"].vlan == "40"
+    corp_deny_rule = parsed.role_policies["corp-employee"].rules[0]
+    assert corp_deny_rule.source == "any"
+    assert corp_deny_rule.destination == "network 10.0.0.0 255.0.0.0"
+    assert corp_deny_rule.service == "any"
     assert "controller" in parsed.netdestination_aliases
     assert [entry.value for entry in parsed.netdestination_aliases["controller"]] == [
         "10.10.10.1",

@@ -483,9 +483,9 @@ def _write_html(
     cards = "\n".join(
         f"""
         <section class="metric">
-          <span>{escape(str(row.get('controller', '')))}</span>
-          <strong>{escape(str(row.get('ssid_count', 0)))}</strong>
-          <small>SSID / Role {escape(str(row.get('role_count', 0)))} / Alias {escape(str(row.get('alias_count', 0)))} / Unresolved {escape(str(row.get('unresolved_count', 0)))}</small>
+          <span class="metric-label">{escape(str(row.get('controller', '')))}</span>
+          <strong class="metric-value">{escape(str(row.get('ssid_count', 0)))}</strong>
+          <small class="metric-detail">SSID / Role {escape(str(row.get('role_count', 0)))} / Alias {escape(str(row.get('alias_count', 0)))} / Unresolved {escape(str(row.get('unresolved_count', 0)))}</small>
         </section>
         """
         for row in overview
@@ -572,42 +572,104 @@ def _write_html(
   <title>WLC SSID Role ACL Report</title>
   <style>
     :root {{
-      --bg: #f5f7fa;
+      --bg: #eef2f6;
       --panel: #ffffff;
+      --panel-subtle: #f8fafc;
       --text: #172033;
       --muted: #667085;
-      --line: #d0d5dd;
+      --line: #d6dde7;
+      --line-strong: #b8c3d2;
       --accent: #0f6cbd;
-      --accent-2: #0b7a75;
+      --accent-deep: #174a7c;
+      --accent-soft: #eaf3ff;
+      --success: #067647;
+      --success-soft: #ecfdf3;
+      --danger: #b42318;
+      --danger-soft: #fef3f2;
+      --warning: #b54708;
+      --warning-soft: #fffaeb;
+      --info: #0b7a75;
+      --shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
     }}
     * {{ box-sizing: border-box; }}
     body {{
       margin: 0;
       font-family: "Segoe UI", "Malgun Gothic", Arial, sans-serif;
       color: var(--text);
-      background: var(--bg);
+      background:
+        linear-gradient(180deg, #f8fafc 0, var(--bg) 280px),
+        var(--bg);
     }}
     header {{
       background: #ffffff;
       border-bottom: 1px solid var(--line);
-      padding: 20px 28px;
+      padding: 18px 28px;
     }}
-    h1 {{ margin: 0; font-size: 24px; letter-spacing: 0; }}
-    main {{ padding: 24px 28px 40px; }}
-    .metrics {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 18px; }}
+    .report-header-inner {{
+      align-items: center;
+      display: flex;
+      gap: 18px;
+      justify-content: space-between;
+      margin: 0 auto;
+      max-width: 1480px;
+    }}
+    .report-kicker {{
+      color: var(--accent-deep);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+    }}
+    .report-summary-pill {{
+      align-items: center;
+      background: var(--accent-soft);
+      border: 1px solid #b9dcff;
+      border-radius: 8px;
+      color: var(--accent-deep);
+      display: inline-flex;
+      gap: 10px;
+      padding: 10px 12px;
+    }}
+    .report-summary-pill span {{
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }}
+    .report-summary-pill strong {{ font-size: 22px; }}
+    h1 {{ margin: 0; font-size: 25px; letter-spacing: 0; }}
+    h2 {{ font-size: 18px; margin: 22px 0 10px; }}
+    main {{
+      margin: 0 auto;
+      max-width: 1480px;
+      padding: 22px 28px 42px;
+    }}
+    .metrics {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 16px; }}
     .metric {{
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 8px;
-      padding: 14px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+      padding: 14px 15px;
+      position: relative;
     }}
-    .metric span, .metric small {{ color: var(--muted); display: block; }}
-    .metric strong {{ font-size: 28px; display: block; margin: 4px 0; }}
+    .metric::before {{
+      background: var(--accent);
+      border-radius: 8px 0 0 8px;
+      content: "";
+      inset: 0 auto 0 0;
+      position: absolute;
+      width: 4px;
+    }}
+    .metric-label, .metric-detail {{ color: var(--muted); display: block; }}
+    .metric-label {{ font-size: 12px; font-weight: 700; }}
+    .metric-value {{ font-size: 30px; display: block; margin: 4px 0; }}
+    .metric-detail {{ font-size: 12px; }}
     .report-actions {{
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
-      margin: 18px 0 10px;
+      margin: 16px 0 12px;
     }}
     .report-action {{
       background: #0f6cbd;
@@ -616,14 +678,25 @@ def _write_html(
       color: #ffffff;
       cursor: pointer;
       font-size: 13px;
+      font-weight: 700;
       padding: 10px 12px;
+      transition: background .15s ease, box-shadow .15s ease, transform .15s ease;
     }}
-    .report-action.secondary {{ background: #e5eef8; color: #15324b; }}
+    .report-action:hover {{
+      background: #0b5aa1;
+      box-shadow: 0 6px 14px rgba(15, 108, 189, 0.22);
+      transform: translateY(-1px);
+    }}
+    .report-action.secondary {{ background: #e8eef6; color: #15324b; }}
+    .report-action.secondary:hover {{
+      background: #dce6f2;
+      box-shadow: 0 6px 14px rgba(21, 50, 75, 0.10);
+    }}
     .role-tabs {{
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-      margin: 10px 0 12px;
+      margin: 10px 0 14px;
     }}
     .role-tab {{
       align-items: flex-start;
@@ -636,16 +709,34 @@ def _write_html(
       flex-direction: column;
       gap: 3px;
       min-width: 150px;
-      padding: 9px 12px;
+      padding: 10px 12px;
+      position: relative;
       text-align: left;
+      transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+    }}
+    .role-tab:hover {{
+      border-color: #9fc5f1;
+      box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+      transform: translateY(-1px);
     }}
     .role-tab[aria-selected="true"] {{
       background: #eef6ff;
-      border-color: #84caff;
+      border-color: #5aa9f4;
+      box-shadow: 0 8px 18px rgba(15, 108, 189, 0.14);
       color: #175cd3;
       font-weight: 600;
     }}
-    .role-tab-name {{ font-size: 13px; }}
+    .role-tab[aria-selected="true"]::after {{
+      background: var(--accent);
+      border-radius: 999px;
+      bottom: 7px;
+      content: "";
+      height: 5px;
+      position: absolute;
+      right: 8px;
+      width: 5px;
+    }}
+    .role-tab-name {{ font-size: 13px; line-height: 1.25; }}
     .role-tab-meta {{ color: var(--muted); font-size: 11px; font-weight: 400; }}
     .zero-user-role[hidden] {{ display: none; }}
     .zero-user-role-controls {{
@@ -664,7 +755,7 @@ def _write_html(
       padding: 8px 10px;
     }}
     .local-network {{
-      background: #f8fafc;
+      background: var(--panel-subtle);
       border-top: 1px solid var(--line);
       padding: 10px 14px 12px;
     }}
@@ -701,23 +792,34 @@ def _write_html(
     .local-network-status.status-not-collected {{ background: #667085; }}
     .local-network-notes {{ color: var(--muted); font-size: 12px; margin-top: 5px; }}
     .acl-filter-actions {{
-      background: #ffffff;
+      background: var(--panel-subtle);
       border-top: 1px solid var(--line);
       padding: 9px 14px;
     }}
     .acl-filter-button {{
-      background: #e5eef8;
-      border: 0;
+      background: #e8eef6;
+      border: 1px solid #d4deea;
       border-radius: 6px;
       color: #15324b;
       cursor: pointer;
       font-size: 12px;
+      font-weight: 700;
       padding: 8px 10px;
     }}
     .other-acl-rule[hidden] {{ display: none; }}
-    table {{ width: 100%; border-collapse: collapse; background: var(--panel); }}
+    table {{ width: 100%; border-collapse: separate; border-spacing: 0; background: var(--panel); }}
     th, td {{ border-bottom: 1px solid var(--line); padding: 9px 10px; text-align: left; vertical-align: top; font-size: 13px; }}
-    th {{ background: #1f4e78; color: #fff; position: sticky; top: 0; }}
+    th {{
+      background: #213b59;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }}
+    tbody tr:nth-child(even):not(.alias-detail-row) {{ background: #fbfcfe; }}
+    tbody tr:hover:not(.alias-detail-row) {{ background: #f0f6ff; }}
     .raw-column {{ display: none; }}
     body.raw-visible .raw-column {{ display: table-cell; }}
     .alias-prefix {{
@@ -770,21 +872,45 @@ def _write_html(
     .alias-type-range {{ background: #c2410c; }}
     .alias-type-name {{ background: #6d28d9; }}
     .alias-type-raw {{ background: #667085; }}
+    .rule-badge {{
+      border-radius: 999px;
+      display: inline-flex;
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1;
+      padding: 5px 8px;
+      white-space: nowrap;
+    }}
+    .action-permit {{ background: var(--success-soft); color: var(--success); }}
+    .action-deny {{ background: var(--danger-soft); color: var(--danger); }}
+    .action-special {{ background: var(--warning-soft); color: var(--warning); }}
+    .action-unknown {{ background: #eef2f6; color: #475467; }}
+    .service-badge {{
+      background: #f2f4f7;
+      border: 1px solid #e4e7ec;
+      color: #344054;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }}
     .acl-section {{
-      margin-top: 12px;
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 8px;
+      box-shadow: var(--shadow);
+      margin-top: 14px;
       overflow: hidden;
     }}
     .acl-section-header {{
       align-items: center;
+      background: linear-gradient(180deg, #ffffff, #f8fafc);
+      border-bottom: 1px solid var(--line);
       display: flex;
       gap: 10px;
       justify-content: space-between;
       padding: 12px 14px;
     }}
-    .acl-section-header h3 {{ font-size: 15px; margin: 0; }}
+    .acl-section-header h3 {{ font-size: 16px; margin: 0; }}
     .acl-section-header span {{ color: var(--muted); font-size: 12px; }}
     .raw {{ font-family: Consolas, monospace; white-space: pre-wrap; }}
     .comment-cell {{ min-width: 220px; width: 24%; }}
@@ -816,10 +942,37 @@ def _write_html(
     }}
     .notice {{ color: var(--muted); margin: 8px 0 0; }}
     {access_check_css}
+    @media (max-width: 720px) {{
+      header {{ padding: 16px 18px; }}
+      main {{ padding: 18px 16px 34px; }}
+      .report-header-inner {{
+        align-items: flex-start;
+        flex-direction: column;
+      }}
+      .report-summary-pill {{
+        width: 100%;
+        justify-content: space-between;
+      }}
+      .role-tab {{
+        flex: 1 1 100%;
+      }}
+      .acl-section-header {{
+        align-items: flex-start;
+        flex-direction: column;
+      }}
+      th, td {{
+        padding: 8px;
+      }}
+    }}
     @media print {{
       body {{ background: #ffffff; }}
       header, main {{ padding: 14px 18px; }}
       .no-print {{ display: none !important; }}
+      .metric,
+      .acl-section,
+      .access-check {{
+        box-shadow: none;
+      }}
       .acl-section {{ break-inside: auto; }}
       th {{ position: static; }}
       .alias-link {{
@@ -840,8 +993,17 @@ def _write_html(
 </head>
 <body>
   <header>
-    <h1>WLC SSID Role ACL Report</h1>
-    <p class="notice">생성시각: {escape(datetime.now().isoformat(timespec='seconds'))} / Unresolved: {unresolved_count}</p>
+    <div class="report-header-inner">
+      <div>
+        <div class="report-kicker">Wireless Role ACL Review</div>
+        <h1>WLC SSID Role ACL Report</h1>
+        <p class="notice">생성시각: {escape(datetime.now().isoformat(timespec='seconds'))} / Unresolved: {unresolved_count}</p>
+      </div>
+      <div class="report-summary-pill">
+        <span>Controllers</span>
+        <strong>{len(overview)}</strong>
+      </div>
+    </div>
   </header>
   <main>
     <div class="metrics">{cards}</div>
@@ -1228,14 +1390,18 @@ def _access_check_css() -> str:
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 8px;
+      box-shadow: var(--shadow);
       margin: 18px 0;
-      padding: 14px;
+      overflow: hidden;
+      padding: 0;
     }
     .access-check-title {
       align-items: center;
+      background: linear-gradient(180deg, #ffffff, #f7fbff);
+      border-bottom: 1px solid var(--line);
       display: flex;
       justify-content: space-between;
-      margin-bottom: 10px;
+      padding: 13px 15px;
     }
     .access-check-title h2 {
       font-size: 18px;
@@ -1246,6 +1412,7 @@ def _access_check_css() -> str:
       display: grid;
       gap: 10px;
       grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      padding: 14px 15px;
     }
     .access-field {
       display: flex;
@@ -1268,6 +1435,13 @@ def _access_check_css() -> str:
       padding: 8px 10px;
       width: 100%;
     }
+    .access-field input:focus,
+    .access-field select:focus,
+    .comment-input:focus {
+      border-color: #5aa9f4;
+      box-shadow: 0 0 0 3px rgba(90, 169, 244, 0.18);
+      outline: 0;
+    }
     .access-run {
       min-height: 38px;
       width: 100%;
@@ -1275,7 +1449,7 @@ def _access_check_css() -> str:
     .access-check-result {
       border: 1px solid var(--line);
       border-radius: 8px;
-      margin-top: 12px;
+      margin: 0 15px 14px;
       padding: 10px 12px;
     }
     .access-check-result[data-status="empty"] {
@@ -1306,6 +1480,9 @@ def _access_check_css() -> str:
       gap: 8px;
       font-weight: 700;
       margin-bottom: 8px;
+    }
+    .access-result-title span:first-child {
+      font-size: 16px;
     }
     .access-conditional {
       background: #f79009;
@@ -1340,8 +1517,8 @@ def _access_check_css() -> str:
     }
     .access-history {
       border-top: 1px solid var(--line);
-      margin-top: 12px;
-      padding-top: 12px;
+      background: var(--panel-subtle);
+      padding: 12px 15px 14px;
     }
     .access-history-header {
       align-items: center;
@@ -1819,10 +1996,10 @@ def _acl_rows_html(
             <tr class="{row_class}"{other_acl_attr} data-rule-id="{escape(rule_id)}">
               <td>{escape(str(row.get('acl', '')))}</td>
               <td>{escape(str(row.get('sequence', '')))}</td>
-              <td>{escape(str(row.get('action', '')))}</td>
+              <td>{_action_badge_html(str(row.get('action', '')))}</td>
               <td>{_acl_field_html(str(row.get('source', '')), detail_id, str(row.get('source_interpretation', '')))}</td>
               <td>{_acl_field_html(str(row.get('destination', '')), detail_id, str(row.get('destination_interpretation', '')))}</td>
-              <td>{escape(str(row.get('service', '')))}</td>
+              <td>{_service_badge_html(str(row.get('service', '')))}</td>
               <td class="raw raw-column">{escape(str(row.get('raw_rule', '')))}</td>
               <td class="comment-cell">
                 <textarea class="comment-input" data-comment-id="{escape(comment_id)}" aria-label="ACL comment"></textarea>
@@ -1853,6 +2030,25 @@ def _other_acl_meta_text(other_acl_count: int) -> str:
     if other_acl_count <= 0:
         return ""
     return f" / {other_acl_count} other hidden"
+
+
+def _action_badge_html(action: str) -> str:
+    normalized = action.strip().casefold()
+    if normalized == "permit":
+        badge_class = "action-permit"
+    elif normalized == "deny":
+        badge_class = "action-deny"
+    elif normalized in {"src-nat", "dst-nat", "redirect", "route", "tunnel", "forward"}:
+        badge_class = "action-special"
+    else:
+        badge_class = "action-unknown"
+    label = action.strip() or "unknown"
+    return f'<span class="rule-badge {badge_class}">{escape(label)}</span>'
+
+
+def _service_badge_html(service: str) -> str:
+    label = service.strip() or "any"
+    return f'<span class="rule-badge service-badge">{escape(label)}</span>'
 
 
 def _acl_field_html(value: str, detail_id: str, interpretation: str = "") -> str:

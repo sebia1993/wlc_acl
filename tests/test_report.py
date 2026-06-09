@@ -123,6 +123,11 @@ def test_write_excel_and_html_report(tmp_path):
     assert "body.raw-visible .raw-column { display: table-cell; }" in html
     assert "document.body.classList.toggle('raw-visible')" in html
     assert "syncRawToggleButton" in html
+    assert "report-header-inner" in html
+    assert "report-summary-pill" in html
+    assert "rule-badge action-deny" in html
+    assert "rule-badge action-special" in html
+    assert "rule-badge service-badge" in html
     assert 'class="access-check no-print"' in html
     assert 'id="access-check-data" type="application/json"' in html
     assert 'id="access-check-source"' in html

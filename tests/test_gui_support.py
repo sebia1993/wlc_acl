@@ -1,4 +1,6 @@
 from wlc_role_acl_collector.gui_app import (
+    REPORT_NAME_LABEL,
+    WLC_IP_LABEL,
     WLC_TARGET_NOTICE,
     _collection_failure_message,
     _constrain_window_rect,
@@ -23,6 +25,13 @@ def test_gui_app_importable():
 def test_gui_notice_tells_user_to_connect_to_wlc_not_mm():
     assert "Mobility Master(MM)" in WLC_TARGET_NOTICE
     assert "WLC 컨트롤러" in WLC_TARGET_NOTICE
+    assert "Hostname" not in WLC_TARGET_NOTICE
+
+
+def test_gui_connection_labels_do_not_imply_hostname_is_required():
+    assert WLC_IP_LABEL == "WLC IP"
+    assert REPORT_NAME_LABEL == "Report name (optional)"
+    assert "Hostname" not in WLC_IP_LABEL
 
 
 def test_default_gui_output_dir_is_documents_folder():
@@ -47,6 +56,15 @@ def test_gui_input_builds_ssh_target_defaults():
     assert target.controller.device_type == "aruba_os"
     assert target.credentials.username == "admin"
     assert target.credentials.password == "secret"
+
+
+def test_gui_input_requires_wlc_ip():
+    try:
+        build_target_from_gui_input(GuiConnectionInput(host="", username="admin", password="secret"))
+    except ValueError as exc:
+        assert str(exc) == "WLC IP is required."
+    else:
+        raise AssertionError("Expected WLC IP validation error")
 
 
 def test_gui_input_builds_telnet_target_defaults():

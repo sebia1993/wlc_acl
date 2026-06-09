@@ -24,7 +24,7 @@
 
 다음 정보가 필요합니다.
 
-- WLC IP 또는 Hostname
+- WLC IP
 - Username
 - Password
 - Enable password가 필요한 환경이면 Enable password
@@ -74,8 +74,8 @@ python -m wlc_role_acl_collector.gui_app
 
 | 항목 | 설명 |
 | --- | --- |
-| WLC IP/Hostname | 접속할 실제 WLC 컨트롤러 IP 또는 DNS 이름. MM이 아님 |
-| Controller name | 비워두면 `wlc-장비IP` 형태로 자동 지정 |
+| WLC IP | 접속할 실제 WLC 컨트롤러 IP. MM이 아님 |
+| Report name (optional) | 보고서에 표시할 이름. 비워두면 `wlc-장비IP` 형태로 자동 지정 |
 | Protocol | 기본 `ssh`, 필요 시 `telnet` 선택 |
 | Port | SSH는 기본 22, Telnet은 기본 23 |
 | Username | WLC 로그인 계정 |
@@ -210,7 +210,7 @@ python -m wlc_role_acl_collector collect --role-networks config\role_networks.ex
 개발자나 담당자에게 문의할 때는 아래 정보를 전달하면 원인 확인이 빠릅니다.
 
 - 프로그램 실행 시각
-- WLC IP 또는 Controller name
+- WLC IP 또는 Report name
 - 오류 메시지 전체
 - `run.log`
 - 어느 단계에서 멈췄는지: 접속, 명령 수집, 보고서 생성, HTML 확인

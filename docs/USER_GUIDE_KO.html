@@ -124,7 +124,7 @@
     <h2>3. 실행 전 준비 사항</h2>
     <p>다음 정보가 필요합니다.</p>
     <ul>
-      <li>WLC IP 또는 Hostname</li>
+      <li>WLC IP</li>
       <li>Username</li>
       <li>Password</li>
       <li>Enable password가 필요한 환경이면 Enable password</li>
@@ -169,8 +169,8 @@ python -m wlc_role_acl_collector.gui_app</code></pre>
     <table>
       <thead><tr><th>항목</th><th>설명</th></tr></thead>
       <tbody>
-      <tr><td>WLC IP/Hostname</td><td>접속할 실제 WLC 컨트롤러 IP 또는 DNS 이름. MM이 아님</td></tr>
-      <tr><td>Controller name</td><td>비워두면 <code>wlc-장비IP</code> 형태로 자동 지정</td></tr>
+      <tr><td>WLC IP</td><td>접속할 실제 WLC 컨트롤러 IP. MM이 아님</td></tr>
+      <tr><td>Report name (optional)</td><td>보고서에 표시할 이름. 비워두면 <code>wlc-장비IP</code> 형태로 자동 지정</td></tr>
       <tr><td>Protocol</td><td>기본 <code>ssh</code>, 필요 시 <code>telnet</code> 선택</td></tr>
       <tr><td>Port</td><td>SSH는 기본 22, Telnet은 기본 23</td></tr>
       <tr><td>Username</td><td>WLC 로그인 계정</td></tr>
@@ -288,7 +288,7 @@ python -m wlc_role_acl_collector.gui_app</code></pre>
     <p>개발자나 담당자에게 문의할 때는 아래 정보를 전달하면 원인 확인이 빠릅니다.</p>
     <ul>
       <li>프로그램 실행 시각</li>
-      <li>WLC IP 또는 Controller name</li>
+      <li>WLC IP 또는 Report name</li>
       <li>오류 메시지 전체</li>
       <li><code>run.log</code></li>
       <li>어느 단계에서 멈췄는지: 접속, 명령 수집, 보고서 생성, HTML 확인</li>

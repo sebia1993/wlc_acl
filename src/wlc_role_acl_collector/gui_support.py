@@ -21,7 +21,7 @@ class GuiConnectionInput:
 def build_target_from_gui_input(values: GuiConnectionInput) -> ControllerTarget:
     host = values.host.strip()
     if not host:
-        raise ValueError("WLC IP/Hostname is required.")
+        raise ValueError("WLC IP is required.")
 
     protocol = values.protocol.strip().lower() or "ssh"
     if protocol not in {"ssh", "telnet"}:

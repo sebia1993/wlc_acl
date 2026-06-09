@@ -27,7 +27,9 @@ from .role_networks import RoleNetworkDefinitionError, load_role_network_definit
 DEFAULT_WINDOW_SIZE = (1080, 720)
 MIN_WINDOW_SIZE = (760, 520)
 WINDOW_MARGIN = 48
-WLC_TARGET_NOTICE = "접속 대상은 Mobility Master(MM)가 아니라 실제 WLC 컨트롤러 IP/Hostname입니다."
+WLC_IP_LABEL = "WLC IP"
+REPORT_NAME_LABEL = "Report name (optional)"
+WLC_TARGET_NOTICE = "접속 대상은 Mobility Master(MM)가 아니라 실제 WLC 컨트롤러 IP입니다."
 
 
 def _enable_windows_dpi_awareness() -> None:
@@ -252,8 +254,8 @@ class WlcRoleAclCollectorGui(tk.Tk):
 
         self._section_label(form, "Controller")
         self._notice(form, WLC_TARGET_NOTICE)
-        self._entry(form, "WLC IP/Hostname", self.host_var)
-        self._entry(form, "Controller name", self.name_var, hint="비워두면 wlc-IP 형식으로 자동 지정됩니다.")
+        self._entry(form, WLC_IP_LABEL, self.host_var)
+        self._entry(form, REPORT_NAME_LABEL, self.name_var, hint="비워두면 wlc-IP 형식으로 자동 지정됩니다.")
         self._protocol_row(form)
 
         self._section_label(form, "Login")
@@ -491,7 +493,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
         log_lines = [
             "WLC Role ACL Collector run log",
             f"Controller: {target.controller.name}",
-            f"Host: {target.controller.host}",
+            f"WLC IP: {target.controller.host}",
             f"Protocol: {target.controller.protocol}",
             f"Port: {target.controller.port}",
             f"Timeout seconds: {timeout}",

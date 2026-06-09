@@ -19,9 +19,9 @@ def prompt_controller_targets(
     targets: list[ControllerTarget] = []
 
     while True:
-        host = _prompt_required(input_func, "WLC IP/Hostname: ")
+        host = _prompt_required(input_func, "WLC IP: ")
         default_name = f"wlc-{host}"
-        name = _prompt_default(input_func, f"Controller name [{default_name}]: ", default_name)
+        name = _prompt_default(input_func, f"Report name [{default_name}]: ", default_name)
         protocol = _prompt_protocol(input_func)
         default_port = default_port_for_protocol(protocol)
         port = _prompt_int_default(input_func, f"Port [{default_port}]: ", default_port)

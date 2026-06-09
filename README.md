@@ -28,7 +28,8 @@ dist\WlcRoleAclCollectorGUI.exe
 
 GUI 입력 항목:
 
-- WLC IP/Hostname
+- WLC IP
+- Report name: 선택 사항입니다. 비워두면 `wlc-장비IP` 형태로 자동 지정됩니다.
 - Protocol: `ssh` 또는 `telnet`
 - Port: SSH는 `22`, Telnet은 `23` 자동 기본값
 - Username
@@ -97,8 +98,8 @@ python -m wlc_role_acl_collector collect --role-networks config\role_networks.ex
 입력 예시:
 
 ```text
-WLC IP/Hostname: 10.10.10.10
-Controller name [wlc-10.10.10.10]:
+WLC IP: 10.10.10.10
+Report name [wlc-10.10.10.10]:
 Protocol [ssh/telnet] (default: ssh):
 Port [22]:
 Username: admin

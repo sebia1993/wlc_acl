@@ -18,6 +18,7 @@ $releaseRoot = Join-Path $buildDir "release"
 $distExe = Join-Path $distDir "$exeName.exe"
 $releaseZip = Join-Path $distDir "${exeName}_v${version}.zip"
 $roleNetworkTemplate = Join-Path $PSScriptRoot "config\role_networks.example.xlsx"
+$userGuide = Join-Path $PSScriptRoot "docs\USER_GUIDE_KO.md"
 
 New-Item -ItemType Directory -Force -Path $distDir | Out-Null
 New-Item -ItemType Directory -Force -Path $specDir | Out-Null
@@ -49,6 +50,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "Creating release zip..."
 Copy-Item -LiteralPath $distExe -Destination $releaseRoot -Force
+Copy-Item -LiteralPath $userGuide -Destination (Join-Path $releaseRoot "USER_GUIDE_KO.md") -Force
 New-Item -ItemType Directory -Force -Path (Join-Path $releaseRoot "config") | Out-Null
 Copy-Item -LiteralPath $roleNetworkTemplate -Destination (Join-Path $releaseRoot "config") -Force
 Compress-Archive -Path (Join-Path $releaseRoot "*") -DestinationPath $releaseZip -Force

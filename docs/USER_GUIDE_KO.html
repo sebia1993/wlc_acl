@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WLC Role ACL Collector 사용자 설명서</title>
+  <style>
+    :root {
+      --bg: #f3f6fa;
+      --panel: #ffffff;
+      --text: #172033;
+      --muted: #667085;
+      --line: #d6dde7;
+      --accent: #0f6cbd;
+      --code-bg: #111827;
+      --code-text: #e5edf7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", "Malgun Gothic", Arial, sans-serif;
+      line-height: 1.65;
+      margin: 0;
+      padding: 24px;
+    }
+    main {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+      margin: 0 auto;
+      max-width: 1120px;
+      padding: 34px;
+    }
+    h1, h2, h3 { line-height: 1.3; }
+    h1 {
+      border-bottom: 3px solid var(--accent);
+      font-size: 28px;
+      margin: 0 0 24px;
+      padding-bottom: 14px;
+    }
+    h2 {
+      border-top: 1px solid var(--line);
+      font-size: 22px;
+      margin: 34px 0 14px;
+      padding-top: 24px;
+    }
+    h3 { font-size: 18px; margin: 24px 0 10px; }
+    p { margin: 10px 0; }
+    a { color: var(--accent); }
+    ul, ol { padding-left: 24px; }
+    li { margin: 5px 0; }
+    code {
+      background: #eef3f8;
+      border: 1px solid #d8e2ed;
+      border-radius: 5px;
+      font-family: Consolas, "Cascadia Mono", monospace;
+      padding: 1px 5px;
+    }
+    pre {
+      background: var(--code-bg);
+      border-radius: 8px;
+      color: var(--code-text);
+      overflow-x: auto;
+      padding: 14px 16px;
+    }
+    pre code {
+      background: transparent;
+      border: 0;
+      color: inherit;
+      padding: 0;
+    }
+    table {
+      border-collapse: collapse;
+      margin: 14px 0 22px;
+      width: 100%;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #edf4fb; }
+    blockquote {
+      border-left: 4px solid var(--accent);
+      color: var(--muted);
+      margin: 14px 0;
+      padding: 4px 0 4px 14px;
+    }
+    .generated-note {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 34px;
+    }
+    @media print {
+      body { background: #ffffff; padding: 0; }
+      main { border: 0; box-shadow: none; max-width: none; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>WLC Role ACL Collector 사용자 설명서</h1>
+    <h2>1. 이 프로그램의 목적</h2>
+    <p>이 프로그램은 Aruba AOS8 무선랜 컨트롤러에 접속해서 다음 정보를 수집하고 HTML/Excel 보고서로 정리합니다.</p>
+    <ul>
+      <li>어떤 SSID 사용자가 어떤 Role을 받는지</li>
+      <li>Role에 어떤 ACL이 적용되어 있는지</li>
+      <li>ACL의 Source, Destination, Service, Action이 무엇인지</li>
+      <li>Alias가 있으면 해당 Alias 안에 어떤 host, network, range가 있는지</li>
+      <li>특정 Role에서 출발지 IP와 목적지 IP를 입력했을 때 ACL 기준으로 허용/차단되는지</li>
+    </ul>
+    <h2>2. 기본 보안 정책</h2>
+    <p>현재 프로그램은 보안모드가 기본값입니다.</p>
+    <ul>
+      <li>장비 IP, ID, Password는 프로그램 실행 시 직접 입력합니다.</li>
+      <li>Role network Excel은 선택해도 기본 보고서에 저장되지 않습니다.</li>
+      <li>Role network Excel의 파일 경로나 내부 대역 값은 run.log에 남기지 않습니다.</li>
+      <li>HTML Access Check 조회 이력은 기본 저장하지 않습니다.</li>
+      <li>생성된 보고서에는 WLC에서 수집한 ACL, Alias, 설정 정보가 포함될 수 있으므로 외부 공유 전 반드시 내용을 확인해야 합니다.</li>
+    </ul>
+    <h2>3. 실행 전 준비 사항</h2>
+    <p>다음 정보가 필요합니다.</p>
+    <ul>
+      <li>WLC IP 또는 Hostname</li>
+      <li>Username</li>
+      <li>Password</li>
+      <li>Enable password가 필요한 환경이면 Enable password</li>
+      <li>접속 방식: 기본 SSH, 필요 시 Telnet</li>
+      <li>결과 저장 폴더</li>
+      <li>선택 사항: 사내에서만 사용하는 Role network Excel</li>
+    </ul>
+    <p>Role network Excel을 사용할 경우 첫 번째 시트에 아래 컬럼이 있어야 합니다.</p>
+    <table>
+      <thead><tr><th>컬럼</th><th>예시</th></tr></thead>
+      <tbody>
+      <tr><td>Role 이름</td><td>corp-employee</td></tr>
+      <tr><td>네트워크 대역</td><td>10.10.10.0</td></tr>
+      <tr><td>서브넷마스크</td><td>255.255.255.0</td></tr>
+      </tbody>
+    </table>
+    <p>Excel 파일은 실제 <code>.xlsx</code> 또는 <code>.xlsm</code> 형식이어야 합니다. CSV나 구형 <code>.xls</code> 파일의 확장자만 <code>.xlsx</code>로 바꾸면 열 수 없습니다.</p>
+    <h2>4. Windows GUI 실행 방법</h2>
+    <p>배포 ZIP을 받은 경우:</p>
+    <ol>
+      <li>ZIP 파일을 사내 PC에 압축 해제합니다.</li>
+      <li><code>WlcRoleAclCollectorGUI.exe</code>를 실행합니다.</li>
+      <li>Windows SmartScreen 경고가 나오면 회사 보안 정책에 따라 실행 여부를 확인합니다.</li>
+    </ol>
+    <p>ZIP 안에는 설명서가 두 가지 형식으로 포함됩니다.</p>
+    <ul>
+      <li><code>USER_GUIDE_KO.html</code>: 브라우저로 바로 열어 보기 좋은 사용자 설명서</li>
+      <li><code>USER_GUIDE_KO.md</code>: Markdown 원본 설명서</li>
+      <li><code>DEVELOPER_GUIDE_KO.html</code>: 브라우저로 바로 열어 보기 좋은 개발자 설명서</li>
+      <li><code>DEVELOPER_GUIDE_KO.md</code>: Markdown 원본 개발자 설명서</li>
+    </ul>
+    <p>소스 코드 상태에서 실행하는 경우:</p>
+    <pre><code>cd &quot;D:\Codex Project\Network\wlc_role_acl_collector&quot;
+python -m pip install -e .
+python -m wlc_role_acl_collector.gui_app</code></pre>
+    <h2>5. GUI 입력 항목 설명</h2>
+    <table>
+      <thead><tr><th>항목</th><th>설명</th></tr></thead>
+      <tbody>
+      <tr><td>WLC IP/Hostname</td><td>접속할 무선랜 컨트롤러 IP 또는 DNS 이름</td></tr>
+      <tr><td>Controller name</td><td>비워두면 <code>wlc-장비IP</code> 형태로 자동 지정</td></tr>
+      <tr><td>Protocol</td><td>기본 <code>ssh</code>, 필요 시 <code>telnet</code> 선택</td></tr>
+      <tr><td>Port</td><td>SSH는 기본 22, Telnet은 기본 23</td></tr>
+      <tr><td>Username</td><td>WLC 로그인 계정</td></tr>
+      <tr><td>Password</td><td>WLC 로그인 비밀번호</td></tr>
+      <tr><td>Enable password</td><td>enable 권한 진입이 필요한 경우 입력</td></tr>
+      <tr><td>Output</td><td>결과 파일을 저장할 폴더</td></tr>
+      <tr><td>Role network Excel (session only)</td><td>선택 사항. 실행 중에만 읽고 기본 보고서에는 저장하지 않음</td></tr>
+      <tr><td>Timeout seconds</td><td>명령어 응답 대기 시간. 장비가 느리면 90초 이상으로 증가</td></tr>
+      </tbody>
+    </table>
+    <p>입력이 끝나면 <code>수집 시작</code> 버튼을 누릅니다.</p>
+    <h2>6. 수집 후 생성되는 파일</h2>
+    <p>결과는 기본적으로 아래 위치에 생성됩니다.</p>
+    <pre><code>%USERPROFILE%\Documents\WlcRoleAclCollector\outputs\&lt;실행시각&gt;\</code></pre>
+    <p>주요 파일:</p>
+    <table>
+      <thead><tr><th>파일</th><th>설명</th></tr></thead>
+      <tbody>
+      <tr><td><code>ssid_role_acl_report.html</code></td><td>운영자가 보기 쉬운 HTML 보고서</td></tr>
+      <tr><td><code>ssid_role_acl_report.xlsx</code></td><td>Excel 보고서</td></tr>
+      <tr><td><code>run.log</code></td><td>실행 과정과 오류 원인 로그</td></tr>
+      <tr><td><code>raw\&lt;controller&gt;.txt</code></td><td>수집한 원본 명령 결과 일부</td></tr>
+      </tbody>
+    </table>
+    <p>주의: <code>show user-table</code> 원문은 개인정보 노출을 줄이기 위해 raw 파일에 그대로 저장하지 않습니다. 다만 ACL, Alias, WLC 설정에는 내부 IP나 정책명이 포함될 수 있습니다.</p>
+    <h2>7. HTML 보고서 보는 방법</h2>
+    <p>HTML 파일을 브라우저로 열면 Role별 ACL을 확인할 수 있습니다.</p>
+    <ul>
+      <li>상단 Role 버튼을 클릭하면 해당 Role의 ACL 목록이 보입니다.</li>
+      <li>사용자가 많은 Role이 앞쪽에 배치됩니다.</li>
+      <li>사용자가 0명인 Role은 기본 숨김 처리될 수 있으며, 필요 시 <code>Show zero-user roles</code>로 표시합니다.</li>
+      <li>Role 이름과 관련 없는 ACL은 기본 숨김 처리되며, 필요 시 <code>Show other ACLs</code>로 표시합니다.</li>
+      <li>Raw 컬럼은 기본 숨김이며, 필요 시 <code>Raw 보기</code> 버튼으로 표시합니다.</li>
+      <li>Source 또는 Destination에 <code>alias 이름</code>이 있으면 alias 버튼을 클릭해 상세 host, network, range를 확인합니다.</li>
+    </ul>
+    <h2>8. ACL 주석 기능</h2>
+    <p>ACL 행마다 Comment 입력란이 있습니다.</p>
+    <ul>
+      <li>입력한 주석은 브라우저에 임시 저장됩니다.</li>
+      <li><code>주석 포함 HTML 저장</code> 버튼을 누르면 현재 주석이 포함된 별도 HTML 파일을 저장할 수 있습니다.</li>
+      <li>PDF로 저장하려면 <code>PDF 저장/인쇄</code> 버튼을 누르고 브라우저 인쇄 화면에서 PDF 저장을 선택합니다.</li>
+      <li>PDF는 정적인 문서이므로 HTML처럼 클릭, 접기, 펼치기 기능은 유지되지 않습니다.</li>
+    </ul>
+    <h2>9. Access Check 사용 방법</h2>
+    <p>HTML 보고서의 Access Check 영역에서 특정 Role 기준 허용/차단 여부를 확인할 수 있습니다.</p>
+    <p>입력 항목:</p>
+    <table>
+      <thead><tr><th>항목</th><th>설명</th></tr></thead>
+      <tbody>
+      <tr><td>Role</td><td>확인할 사용자 Role</td></tr>
+      <tr><td>Source IP</td><td>사용자 또는 단말의 출발지 IP</td></tr>
+      <tr><td>Destination IP</td><td>접근하려는 목적지 IP</td></tr>
+      <tr><td>Service</td><td>선택 사항. ACL service와 비교할 값</td></tr>
+      </tbody>
+    </table>
+    <p>결과 의미:</p>
+    <table>
+      <thead><tr><th>결과</th><th>의미</th></tr></thead>
+      <tbody>
+      <tr><td>Allowed</td><td>permit ACL에 매칭됨</td></tr>
+      <tr><td>Blocked</td><td>deny ACL에 매칭됨</td></tr>
+      <tr><td>Allowed with NAT/Special Action</td><td>src-nat, dst-nat, redirect, route, tunnel, forward 같은 특수 action에 매칭됨</td></tr>
+      <tr><td>Implicit deny</td><td>매칭되는 ACL이 없어 기본 차단으로 판단</td></tr>
+      <tr><td>Conditional</td><td>Service를 선택하지 않아 정확한 판정에 추가 확인이 필요</td></tr>
+      </tbody>
+    </table>
+    <p>중요한 제한:</p>
+    <ul>
+      <li>Access Check는 보고서 안에 포함된 ACL/Alias 데이터를 기준으로 판단합니다.</li>
+      <li>Service object의 실제 TCP/UDP 포트까지 세부 해석하는 기능은 아직 포함되어 있지 않습니다.</li>
+      <li>보안모드에서는 Access Check 이력이 HTML이나 브라우저 저장소에 기본 저장되지 않습니다.</li>
+      <li>보안모드에서는 Role network Excel의 로컬 대역이 HTML에 포함되지 않으므로, HTML 단독으로는 “Source IP가 해당 Role 대역에 속하는지”까지 검증하지 않습니다.</li>
+    </ul>
+    <h2>10. Role network Excel 사용 방식</h2>
+    <p>Role network Excel은 사내망에서만 선택하는 보조 파일입니다.</p>
+    <p>기본 동작:</p>
+    <ul>
+      <li>프로그램 실행 중에만 읽습니다.</li>
+      <li>HTML/Excel 보고서에는 저장하지 않습니다.</li>
+      <li>run.log에 파일 경로나 대역 값을 남기지 않습니다.</li>
+    </ul>
+    <p>CLI에서 내부 보관용 보고서에 Role network를 반드시 포함해야 하는 경우에만 아래 옵션을 사용합니다.</p>
+    <pre><code>python -m wlc_role_acl_collector collect --role-networks config\role_networks.example.xlsx --export-local-role-networks</code></pre>
+    <p>이 옵션을 사용한 보고서는 내부 네트워크 대역이 포함될 수 있으므로 외부 반출 금지 대상으로 취급해야 합니다.</p>
+    <h2>11. 자주 발생하는 오류</h2>
+    <table>
+      <thead><tr><th>오류</th><th>확인할 내용</th></tr></thead>
+      <tbody>
+      <tr><td>Authentication failed</td><td>ID/PW, 계정 잠금, WLC 로그인 권한 확인</td></tr>
+      <tr><td>Connection timed out or was refused</td><td>IP, 방화벽, SSH/Telnet 활성화, 포트 확인</td></tr>
+      <tr><td>Command failed after login</td><td>로그인은 됐지만 <code>show configuration effective</code> 또는 <code>show rights</code> 권한/응답 문제 확인</td></tr>
+      <tr><td>Unable to open Role network Excel file: File is not a zip file</td><td>실제 Excel <code>.xlsx</code>가 아니라 CSV/HTML/구형 XLS를 확장자만 바꾼 파일인지 확인</td></tr>
+      <tr><td>보고서에 Role이 부족함</td><td>해당 Role의 <code>show rights &lt;role&gt;</code> 명령 권한 또는 수집 로그 확인</td></tr>
+      <tr><td>Access Check 결과가 예상과 다름</td><td>Service 선택 여부, Alias 상세 수집 여부, 숨겨진 other ACL 표시 여부 확인</td></tr>
+      </tbody>
+    </table>
+    <h2>12. 산출물 취급 주의</h2>
+    <p>다음 파일은 내부 정보가 포함될 수 있습니다.</p>
+    <ul>
+      <li><code>ssid_role_acl_report.html</code></li>
+      <li><code>ssid_role_acl_report.xlsx</code></li>
+      <li><code>run.log</code></li>
+      <li><code>raw\&lt;controller&gt;.txt</code></li>
+      <li>Role network Excel</li>
+    </ul>
+    <p>외부 공유 전에는 ACL, Alias, Controller 이름, 내부 IP, 정책명, 주석 내용을 반드시 확인하십시오.</p>
+    <h2>13. 문제가 생겼을 때 전달하면 좋은 정보</h2>
+    <p>개발자나 담당자에게 문의할 때는 아래 정보를 전달하면 원인 확인이 빠릅니다.</p>
+    <ul>
+      <li>프로그램 실행 시각</li>
+      <li>WLC IP 또는 Controller name</li>
+      <li>오류 메시지 전체</li>
+      <li><code>run.log</code></li>
+      <li>어느 단계에서 멈췄는지: 접속, 명령 수집, 보고서 생성, HTML 확인</li>
+    </ul>
+    <p>비밀번호와 Role network Excel 원본은 전달하지 마십시오.</p>
+    <p class="generated-note">Generated from Markdown for browser viewing.</p>
+  </main>
+</body>
+</html>

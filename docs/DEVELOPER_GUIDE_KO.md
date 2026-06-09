@@ -310,8 +310,16 @@ ZIP에는 다음 파일이 포함됩니다.
 
 - `WlcRoleAclCollectorGUI.exe`
 - `USER_GUIDE_KO.md`
+- `USER_GUIDE_KO.html`
 - `DEVELOPER_GUIDE_KO.md`
+- `DEVELOPER_GUIDE_KO.html`
 - `config\role_networks.example.xlsx`
+
+HTML 설명서는 빌드 중 `tools\generate_doc_html.py`가 Markdown 원본에서 자동 생성합니다. 문서를 수정했다면 빌드 전이나 검증 전 아래 명령으로 직접 생성해볼 수 있습니다.
+
+```powershell
+python .\tools\generate_doc_html.py
+```
 
 ## 10. 개발 작업 순서
 

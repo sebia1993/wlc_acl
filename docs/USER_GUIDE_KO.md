@@ -50,6 +50,13 @@ Excel 파일은 실제 `.xlsx` 또는 `.xlsm` 형식이어야 합니다. CSV나 
 2. `WlcRoleAclCollectorGUI.exe`를 실행합니다.
 3. Windows SmartScreen 경고가 나오면 회사 보안 정책에 따라 실행 여부를 확인합니다.
 
+ZIP 안에는 설명서가 두 가지 형식으로 포함됩니다.
+
+- `USER_GUIDE_KO.html`: 브라우저로 바로 열어 보기 좋은 사용자 설명서
+- `USER_GUIDE_KO.md`: Markdown 원본 설명서
+- `DEVELOPER_GUIDE_KO.html`: 브라우저로 바로 열어 보기 좋은 개발자 설명서
+- `DEVELOPER_GUIDE_KO.md`: Markdown 원본 개발자 설명서
+
 소스 코드 상태에서 실행하는 경우:
 
 ```powershell

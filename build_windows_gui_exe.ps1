@@ -8,6 +8,9 @@ Set-Location $PSScriptRoot
 Write-Host "Installing runtime and build dependencies..."
 & $PythonExe -m pip install -e ".[dev]"
 
+Write-Host "Generating HTML guide documents..."
+& $PythonExe ".\tools\generate_doc_html.py"
+
 $version = & $PythonExe -c "from wlc_role_acl_collector import __version__; print(__version__)"
 $exeName = "WlcRoleAclCollectorGUI"
 $distDir = Join-Path $PSScriptRoot "dist"
@@ -19,7 +22,9 @@ $distExe = Join-Path $distDir "$exeName.exe"
 $releaseZip = Join-Path $distDir "${exeName}_v${version}.zip"
 $roleNetworkTemplate = Join-Path $PSScriptRoot "config\role_networks.example.xlsx"
 $userGuide = Join-Path $PSScriptRoot "docs\USER_GUIDE_KO.md"
+$userGuideHtml = Join-Path $PSScriptRoot "docs\USER_GUIDE_KO.html"
 $developerGuide = Join-Path $PSScriptRoot "docs\DEVELOPER_GUIDE_KO.md"
+$developerGuideHtml = Join-Path $PSScriptRoot "docs\DEVELOPER_GUIDE_KO.html"
 
 New-Item -ItemType Directory -Force -Path $distDir | Out-Null
 New-Item -ItemType Directory -Force -Path $specDir | Out-Null
@@ -52,7 +57,9 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "Creating release zip..."
 Copy-Item -LiteralPath $distExe -Destination $releaseRoot -Force
 Copy-Item -LiteralPath $userGuide -Destination (Join-Path $releaseRoot "USER_GUIDE_KO.md") -Force
+Copy-Item -LiteralPath $userGuideHtml -Destination (Join-Path $releaseRoot "USER_GUIDE_KO.html") -Force
 Copy-Item -LiteralPath $developerGuide -Destination (Join-Path $releaseRoot "DEVELOPER_GUIDE_KO.md") -Force
+Copy-Item -LiteralPath $developerGuideHtml -Destination (Join-Path $releaseRoot "DEVELOPER_GUIDE_KO.html") -Force
 New-Item -ItemType Directory -Force -Path (Join-Path $releaseRoot "config") | Out-Null
 Copy-Item -LiteralPath $roleNetworkTemplate -Destination (Join-Path $releaseRoot "config") -Force
 Compress-Archive -Path (Join-Path $releaseRoot "*") -DestinationPath $releaseZip -Force

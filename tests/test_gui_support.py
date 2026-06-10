@@ -1,9 +1,12 @@
 from wlc_role_acl_collector.gui_app import (
     REPORT_NAME_LABEL,
+    STAGE_LABELS,
+    STAGE_PROGRESS,
     WLC_IP_LABEL,
     WLC_TARGET_NOTICE,
     _collection_failure_message,
     _constrain_window_rect,
+    _log_tag_for_line,
     _write_run_log,
     format_collection_progress,
 )
@@ -32,6 +35,32 @@ def test_gui_connection_labels_do_not_imply_hostname_is_required():
     assert WLC_IP_LABEL == "WLC IP"
     assert REPORT_NAME_LABEL == "Report name (optional)"
     assert "Hostname" not in WLC_IP_LABEL
+
+
+def test_gui_stage_labels_support_operational_console_flow():
+    assert [STAGE_LABELS[key] for key in ("ready", "connecting", "collecting", "reporting", "completed")] == [
+        "Ready",
+        "Connecting",
+        "Collecting",
+        "Reporting",
+        "Completed",
+    ]
+    assert STAGE_LABELS["failed"] == "Failed"
+    assert STAGE_PROGRESS == {
+        "ready": 0,
+        "connecting": 20,
+        "collecting": 50,
+        "reporting": 80,
+        "completed": 100,
+        "failed": 100,
+    }
+
+
+def test_log_tag_for_line_classifies_operational_log_levels():
+    assert _log_tag_for_line("ERROR: Authentication failed") == "error"
+    assert _log_tag_for_line("DONE: configuration_effective | show configuration effective | 100 chars") == "success"
+    assert _log_tag_for_line("START: rights::corp | show rights corp") == "info"
+    assert _log_tag_for_line("WLC IP: 10.10.10.10") == "muted"
 
 
 def test_default_gui_output_dir_is_documents_folder():

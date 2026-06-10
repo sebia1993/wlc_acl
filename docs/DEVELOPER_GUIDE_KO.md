@@ -91,6 +91,7 @@ wlc_role_acl_collector/
 - 완료 후 HTML/Excel 열기 버튼 활성화
 - 오류 발생 시 메시지 박스 표시
 - 장비 접속 대상은 MM이 아니라 실제 WLC 컨트롤러라는 안내 표시
+- 정책 운영형 콘솔 디자인, 상태 단계 표시, 로그 색상 태그 표시
 
 주의할 점:
 
@@ -98,6 +99,7 @@ wlc_role_acl_collector/
 - 비밀번호는 파일에 저장하지 않습니다.
 - Role network Excel 경로와 내부 대역은 run.log에 남기지 않습니다.
 - Windows 다중 모니터와 DPI 배율 차이를 고려해 창 위치/크기를 작업영역 안으로 보정합니다.
+- GUI 색상, 단계 라벨, 주요 문구는 `gui_app.py` 상단 상수에서 관리합니다.
 
 ### `collector.py`
 

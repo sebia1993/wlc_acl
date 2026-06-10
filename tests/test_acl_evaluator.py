@@ -95,7 +95,7 @@ def test_evaluate_access_treats_nat_actions_as_special_allow():
     assert result["matchedRule"]["sequence"] == "2"
 
 
-def test_evaluate_access_matches_alias_and_optional_service_is_conditional():
+def test_evaluate_access_auto_service_matches_alias_and_marks_specific_service_conditional():
     access_data = build_access_check_data(
         [
             {
@@ -141,7 +141,53 @@ def test_evaluate_access_matches_alias_and_optional_service_is_conditional():
     assert exact_result["conditional"] is False
     assert conditional_result["status"] == "special"
     assert conditional_result["conditional"] is True
-    assert "Service was not selected" in conditional_result["warnings"][0]
+    assert "Service auto mode matched a rule limited to svc-https" in conditional_result["warnings"][0]
+
+
+def test_evaluate_access_auto_service_uses_first_source_destination_match_in_order():
+    access_data = build_access_check_data(
+        [
+            {
+                "role": "guest-logon",
+                "user_count": 2,
+                "zero_user_hidden": False,
+                "panel_id": "role-panel-1",
+                "rows": [
+                    {
+                        "acl": "guest-logon-acl",
+                        "sequence": 10,
+                        "action": "deny",
+                        "source": "user",
+                        "destination": "host 10.10.10.10",
+                        "service": "svc-http",
+                        "raw_rule": "user host 10.10.10.10 svc-http deny",
+                    },
+                    {
+                        "acl": "guest-logon-acl",
+                        "sequence": 20,
+                        "action": "permit",
+                        "source": "user",
+                        "destination": "host 10.10.10.10",
+                        "service": "svc-https",
+                        "raw_rule": "user host 10.10.10.10 svc-https permit",
+                    },
+                ],
+            }
+        ],
+        [],
+        [],
+    )
+
+    result = evaluate_access(
+        access_data,
+        role="guest-logon",
+        source_ip="10.30.0.10",
+        destination_ip="10.10.10.10",
+    )
+
+    assert result["status"] == "blocked"
+    assert result["conditional"] is True
+    assert result["matchedRule"]["sequence"] == "10"
 
 
 def test_evaluate_access_warns_when_source_is_outside_local_role_network():

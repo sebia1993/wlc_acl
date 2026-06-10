@@ -339,7 +339,9 @@ def _service_matches(rule_service: str, selected_service: str) -> dict[str, Any]
         return {
             "matched": True,
             "conditional": True,
-            "warnings": [f"Service was not selected; matched rule is limited to {rule_service}."],
+            "warnings": [
+                f"Service auto mode matched a rule limited to {rule_service}; select the exact service to confirm."
+            ],
         }
     return {
         "matched": normalized_rule_service == "any" or normalized_rule_service == selected_service,

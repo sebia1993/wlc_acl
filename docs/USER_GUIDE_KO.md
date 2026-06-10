@@ -152,7 +152,7 @@ Role ACL Detail에서 Role 버튼을 클릭하면 Access Check의 Role 선택값
 | Role | 확인할 사용자 Role |
 | Source IP | 사용자 또는 단말의 출발지 IP |
 | Destination IP | 접근하려는 목적지 IP |
-| Service | 선택 사항. ACL service와 비교할 값 |
+| Service | 선택 사항. 기본값은 자동 매칭이며, Source/Destination이 맞는 ACL을 위에서 아래 순서로 찾습니다. 특정 service ACL에 매칭되면 Conditional로 표시됩니다. |
 
 결과 의미:
 
@@ -162,11 +162,13 @@ Role ACL Detail에서 Role 버튼을 클릭하면 Access Check의 Role 선택값
 | Blocked | deny ACL에 매칭됨 |
 | Allowed with NAT/Special Action | src-nat, dst-nat, redirect, route, tunnel, forward 같은 특수 action에 매칭됨 |
 | Implicit deny | 매칭되는 ACL이 없어 기본 차단으로 판단 |
-| Conditional | Service를 선택하지 않아 정확한 판정에 추가 확인이 필요 |
+| Conditional | Service 자동 매칭 상태에서 특정 service ACL에 매칭되어 추가 확인이 필요 |
 
 중요한 제한:
 
 - Access Check는 보고서 안에 포함된 ACL/Alias 데이터를 기준으로 판단합니다.
+- Service를 선택하지 않으면 `Auto - match by source/destination` 모드로 동작하며, ACL 표시 순서대로 첫 번째 Source/Destination 매칭 규칙을 찾습니다.
+- Service 자동 매칭 결과가 `any`가 아닌 특정 service ACL이면 조건부 판정으로 표시합니다.
 - Service object의 실제 TCP/UDP 포트까지 세부 해석하는 기능은 아직 포함되어 있지 않습니다.
 - 보안모드에서는 Access Check 이력이 HTML이나 브라우저 저장소에 기본 저장되지 않습니다.
 - 보안모드에서는 Role network Excel의 로컬 대역이 HTML에 포함되지 않으므로, HTML 단독으로는 “Source IP가 해당 Role 대역에 속하는지”까지 검증하지 않습니다.

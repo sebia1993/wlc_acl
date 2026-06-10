@@ -1428,7 +1428,7 @@ def _access_check_controls_html(access_check_data: dict[str, Any], *, history_en
         <label class="access-field">
           <span>Service</span>
           <select id="access-check-service"{disabled}>
-            <option value="">No service selected</option>
+            <option value="">Auto - match by source/destination</option>
             {service_options}
           </select>
         </label>
@@ -1874,7 +1874,7 @@ def _access_check_script(*, history_enabled: bool = False) -> str:
         return {
           matched: true,
           conditional: true,
-          warnings: [`Service was not selected; matched rule is limited to ${ruleService}.`],
+          warnings: [`Service auto mode matched a rule limited to ${ruleService}; select the exact service to confirm.`],
         };
       }
       return {

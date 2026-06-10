@@ -201,6 +201,12 @@ HTML Access Check의 판단 로직을 준비하는 파일입니다.
 - `range 10.1.1.10 10.1.1.20`
 - `alias 이름`
 
+Service 미선택 동작:
+
+- Source/Destination이 맞는 첫 ACL을 위에서 아래 순서로 자동 매칭합니다.
+- 매칭된 ACL의 service가 `any`이면 확정 판정으로 표시합니다.
+- 매칭된 ACL의 service가 `any`가 아니면 `Conditional`로 표시합니다.
+
 판정 결과:
 
 - `Allowed`

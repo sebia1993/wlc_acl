@@ -133,6 +133,8 @@ def test_write_excel_and_html_report(tmp_path):
     assert 'id="access-check-data" type="application/json"' in html
     assert 'id="access-check-source"' in html
     assert 'id="access-check-destination"' in html
+    assert "Auto - match by source/destination" in html
+    assert "Service auto mode matched a rule limited to" in html
     assert 'id="access-check-history-data"' not in html
     assert 'id="access-check-history"' not in html
     assert 'id="clear-access-history"' not in html

@@ -1997,6 +1997,23 @@ def _access_check_script(*, history_enabled: bool = False) -> str:
         accessRenderResult({ status: 'error', verdict: `Role not found: ${roleName}`, warnings: [] });
         return;
       }
+      if (!(roleData.rules || []).length) {
+        const result = {
+          status: 'unknown',
+          verdict: 'No matching Role ACL',
+          conditional: false,
+          matchedRule: null,
+          warnings: ['Access Check only evaluates ACLs whose ACL name exactly matches the selected Role.'],
+        };
+        accessRenderResult(result);
+        accessAddHistoryFromResult(result, {
+          roleName,
+          sourceText,
+          destinationText,
+          selectedService: accessServiceInput?.value || '',
+        });
+        return;
+      }
       const selectedService = accessServiceInput?.value || '';
       const checkContext = { roleName, sourceText, destinationText, selectedService };
       const localWarnings = accessLocalWarnings(roleData, sourceNumber, sourceText);

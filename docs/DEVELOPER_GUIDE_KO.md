@@ -192,6 +192,13 @@ access_history_enabled=False
 
 HTML Access Check의 판단 로직을 준비하는 파일입니다.
 
+Access Check 대상 ACL:
+
+- ACL 이름이 선택한 Role 이름과 정확히 같은 row만 판정 데이터에 포함합니다.
+- 비교는 앞뒤 공백 제거 후 대소문자 무시 방식으로 수행합니다.
+- `guest-logon` Role 기준 `guest-logon-acl`처럼 이름이 비슷하지만 정확히 같지 않은 ACL은 제외합니다.
+- 대상 ACL이 없으면 `No matching Role ACL` 상태를 표시합니다.
+
 지원하는 Source/Destination 형태:
 
 - `any`

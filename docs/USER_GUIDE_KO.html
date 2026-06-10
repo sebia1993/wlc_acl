@@ -229,6 +229,7 @@ python -m wlc_role_acl_collector.gui_app</code></pre>
     </ul>
     <h2>9. Access Check 사용 방법</h2>
     <p>HTML 보고서의 Access Check 영역에서 특정 Role 기준 허용/차단 여부를 확인할 수 있습니다.</p>
+    <p>Access Check는 선택한 Role 안에서 ACL 이름이 Role 이름과 정확히 같은 ACL만 검사합니다. 예를 들어 Role이 <code>guest-logon</code>이면 ACL 이름도 정확히 <code>guest-logon</code>인 항목만 판정 대상입니다. <code>guest-logon-acl</code>처럼 비슷하지만 이름이 다른 ACL은 Role ACL Detail에는 보일 수 있지만 Access Check 판정에는 사용하지 않습니다.</p>
     <p>Role ACL Detail에서 Role 버튼을 클릭하면 Access Check의 Role 선택값도 같은 Role로 자동 변경됩니다. Role별 ACL을 보면서 바로 출발지/목적지 IP 검사를 이어갈 때 사용합니다.</p>
     <p>입력 항목:</p>
     <table>
@@ -249,11 +250,13 @@ python -m wlc_role_acl_collector.gui_app</code></pre>
       <tr><td>Allowed with NAT/Special Action</td><td>src-nat, dst-nat, redirect, route, tunnel, forward 같은 특수 action에 매칭됨</td></tr>
       <tr><td>Implicit deny</td><td>매칭되는 ACL이 없어 기본 차단으로 판단</td></tr>
       <tr><td>Conditional</td><td>Service 자동 매칭 상태에서 특정 service ACL에 매칭되어 추가 확인이 필요</td></tr>
+      <tr><td>No matching Role ACL</td><td>Role 이름과 정확히 같은 ACL이 없어 Access Check로 판정할 수 없음</td></tr>
       </tbody>
     </table>
     <p>중요한 제한:</p>
     <ul>
       <li>Access Check는 보고서 안에 포함된 ACL/Alias 데이터를 기준으로 판단합니다.</li>
+      <li>Access Check는 ACL 이름이 Role 이름과 정확히 같은 ACL만 검사합니다.</li>
       <li>Service를 선택하지 않으면 <code>Auto - match by source/destination</code> 모드로 동작하며, ACL 표시 순서대로 첫 번째 Source/Destination 매칭 규칙을 찾습니다.</li>
       <li>Service 자동 매칭 결과가 <code>any</code>가 아닌 특정 service ACL이면 조건부 판정으로 표시합니다.</li>
       <li>Service object의 실제 TCP/UDP 포트까지 세부 해석하는 기능은 아직 포함되어 있지 않습니다.</li>

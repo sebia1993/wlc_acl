@@ -259,6 +259,13 @@ access_history_enabled=False</code></pre>
     <p>이 기본값 때문에 Role network Excel을 선택해도 기본 HTML/Excel에는 내부 대역이 저장되지 않습니다.</p>
     <h3><code>acl_evaluator.py</code></h3>
     <p>HTML Access Check의 판단 로직을 준비하는 파일입니다.</p>
+    <p>Access Check 대상 ACL:</p>
+    <ul>
+      <li>ACL 이름이 선택한 Role 이름과 정확히 같은 row만 판정 데이터에 포함합니다.</li>
+      <li>비교는 앞뒤 공백 제거 후 대소문자 무시 방식으로 수행합니다.</li>
+      <li><code>guest-logon</code> Role 기준 <code>guest-logon-acl</code>처럼 이름이 비슷하지만 정확히 같지 않은 ACL은 제외합니다.</li>
+      <li>대상 ACL이 없으면 <code>No matching Role ACL</code> 상태를 표시합니다.</li>
+    </ul>
     <p>지원하는 Source/Destination 형태:</p>
     <ul>
       <li><code>any</code></li>

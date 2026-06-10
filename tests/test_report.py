@@ -135,10 +135,12 @@ def test_write_excel_and_html_report(tmp_path):
     assert 'id="access-check-destination"' in html
     assert "Auto - match by source/destination" in html
     assert "Service auto mode matched a rule limited to" in html
+    assert "No matching Role ACL" in html
+    assert "Access Check only evaluates ACLs whose ACL name exactly matches the selected Role." in html
     assert 'id="access-check-history-data"' not in html
     assert 'id="access-check-history"' not in html
     assert 'id="clear-access-history"' not in html
-    assert '"sourceMatchers"' in html
+    assert "rule.sourceMatchers" in html
     assert "runAccessCheck" in html
     assert "accessHighlightRule" in html
     assert "function syncAccessRoleSelection(roleName)" in html

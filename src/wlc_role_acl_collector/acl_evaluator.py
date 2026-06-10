@@ -12,6 +12,10 @@ from typing import Any
 
 
 SPECIAL_ALLOW_ACTIONS = {"src-nat", "dst-nat", "redirect", "route", "tunnel", "forward"}
+NO_MATCHING_ROLE_ACL_VERDICT = "No matching Role ACL"
+EXACT_ROLE_ACL_WARNING = (
+    "Access Check only evaluates ACLs whose ACL name exactly matches the selected Role."
+)
 
 
 def access_rule_id(role: str, index: int) -> str:
@@ -35,6 +39,8 @@ def build_access_check_data(
         role = _clean(item.get("role"))
         rules: list[dict[str, Any]] = []
         for index, row in enumerate(item.get("rows", []), start=1):
+            if not _acl_name_exactly_matches_role(role, _clean(row.get("acl"))):
+                continue
             service = _clean(row.get("service"))
             if service:
                 services.add(service)
@@ -129,6 +135,14 @@ def evaluate_access(
             "status": "error",
             "verdict": "Role not found",
             "warnings": [f"Role was not found in the report data: {role}"],
+        }
+    if not role_data.get("rules", []):
+        return {
+            "status": "unknown",
+            "verdict": NO_MATCHING_ROLE_ACL_VERDICT,
+            "conditional": False,
+            "matchedRule": None,
+            "warnings": [EXACT_ROLE_ACL_WARNING],
         }
 
     local_warnings = _local_source_warnings(role_data, source_number, source_ip)
@@ -378,6 +392,10 @@ def _group_alias_rows(rows: list[dict[str, Any]]) -> dict[str, list[dict[str, An
         if alias:
             grouped.setdefault(alias.casefold(), []).append(row)
     return grouped
+
+
+def _acl_name_exactly_matches_role(role: str, acl_name: str) -> bool:
+    return bool(role.strip()) and role.strip().casefold() == acl_name.strip().casefold()
 
 
 def _group_local_network_rows(rows: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:

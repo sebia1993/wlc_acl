@@ -6,6 +6,8 @@ def test_classifies_authentication_failure():
     info = classify_error_message("Authentication failed: bad password")
 
     assert info.category == "authentication"
+    assert info.code == "WLC-AUTH-001"
+    assert "Error code: WLC-AUTH-001" in info.as_text()
     assert "username/password" in info.suggestion
 
 
@@ -30,4 +32,3 @@ def test_summarizes_missing_config_as_command_failure():
     info = summarize_collection_failure(result)
 
     assert info.category == "command"
-

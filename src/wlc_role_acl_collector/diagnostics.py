@@ -15,7 +15,7 @@ class FailureInfo:
     code: str = "WLC-UNK-001"
 
     def as_text(self) -> str:
-        return f"{self.title}\n\n{self.detail}\n\n{self.suggestion}"
+        return f"{self.title}\n\nError code: {self.code}\n\n{self.detail}\n\n{self.suggestion}"
 
 
 def classify_error_message(message: str) -> FailureInfo:

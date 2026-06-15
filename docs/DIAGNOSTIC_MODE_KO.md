@@ -4,6 +4,13 @@
 
 ## 실행 방식
 
+GUI에서 실행:
+
+1. `WlcRoleAclCollectorGUI.exe` 실행
+2. WLC IP, protocol, port, username, password 입력
+3. `Safe Diagnostic` 클릭
+4. 완료 후 `Open HTML` 또는 `Open Folder` 클릭
+
 CLI에서 실행:
 
 ```powershell

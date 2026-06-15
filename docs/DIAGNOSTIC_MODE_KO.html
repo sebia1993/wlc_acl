@@ -105,6 +105,13 @@
     <h1>WLC Role ACL Collector 진단 모드</h1>
     <p>진단 모드는 회사 내부망 PC에서 실행해도 원본 장비 출력을 저장하지 않는 확인 모드입니다.</p>
     <h2>실행 방식</h2>
+    <p>GUI에서 실행:</p>
+    <ol>
+      <li><code>WlcRoleAclCollectorGUI.exe</code> 실행</li>
+      <li>WLC IP, protocol, port, username, password 입력</li>
+      <li><code>Safe Diagnostic</code> 클릭</li>
+      <li>완료 후 <code>Open HTML</code> 또는 <code>Open Folder</code> 클릭</li>
+    </ol>
     <p>CLI에서 실행:</p>
     <pre><code>WlcRoleAclCollectorCLI.exe diagnose --controllers config\controllers.example.csv --output-dir outputs</code></pre>
     <p>Python 소스 환경에서 실행:</p>

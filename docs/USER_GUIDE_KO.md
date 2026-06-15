@@ -57,8 +57,8 @@ Excel 파일은 실제 `.xlsx` 또는 `.xlsm` 형식이어야 합니다. CSV나 
 
 ZIP에는 GUI 실행 파일과 콘솔 실행 파일이 함께 포함됩니다.
 
-- `WlcRoleAclCollectorGUI.exe`: 일반 수집용 Windows 화면
-- `WlcRoleAclCollectorCLI.exe`: 진단 모드와 mock 서버 실행용 콘솔 도구
+- `WlcRoleAclCollectorGUI.exe`: 일반 수집과 안전 진단을 실행하는 Windows 화면
+- `WlcRoleAclCollectorCLI.exe`: 자동화 진단과 mock 서버 실행용 콘솔 도구
 
 ZIP 안에는 설명서가 두 가지 형식으로 포함됩니다.
 
@@ -217,6 +217,17 @@ python -m wlc_role_acl_collector collect --role-networks config\role_networks.ex
 ## 12. 진단 모드와 오류 코드
 
 현장에서 문제가 발생했지만 원본 로그를 외부로 가져올 수 없는 경우 진단 모드를 사용합니다.
+
+GUI에서 실행하는 경우:
+
+1. `WlcRoleAclCollectorGUI.exe`를 실행합니다.
+2. 평소 수집과 동일하게 `WLC IP`, `Protocol`, `Port`, `Username`, `Password`를 입력합니다.
+3. `Safe Diagnostic` 버튼을 누릅니다.
+4. 완료 후 `Open HTML` 또는 `Open Folder`로 진단 결과를 확인합니다.
+
+GUI 진단 모드는 수집 보고서용 raw 폴더를 만들지 않습니다. 결과 파일에는 단계, 오류 코드, command_id, 안전한 조치 안내만 포함됩니다.
+
+CLI에서 실행하는 경우:
 
 ```powershell
 WlcRoleAclCollectorCLI.exe diagnose --controllers config\controllers.example.csv --output-dir outputs

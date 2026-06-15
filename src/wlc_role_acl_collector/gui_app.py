@@ -17,6 +17,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from .collector import collect_from_controller
+from .diagnostic_mode import run_diagnostic
 from .diagnostics import classify_error_message, summarize_collection_failure
 from .gui_support import GuiConnectionInput, build_target_from_gui_input, default_gui_output_dir
 from .models import CollectionResult, CommandOutput
@@ -53,7 +54,9 @@ LOG_WARNING = "#fcd34d"
 LOG_ERROR = "#fca5a5"
 WLC_IP_LABEL = "WLC IP"
 REPORT_NAME_LABEL = "Report name (optional)"
-WLC_TARGET_NOTICE = "접속 대상은 Mobility Master(MM)가 아니라 실제 WLC 컨트롤러 IP입니다."
+WLC_TARGET_NOTICE = "Connect to the WLC controller IP, not Mobility Master(MM)."
+COLLECTION_ACTION_LABEL = "Start Collection"
+DIAGNOSTIC_ACTION_LABEL = "Safe Diagnostic"
 STAGE_SEQUENCE = ("ready", "connecting", "collecting", "reporting", "completed")
 STAGE_LABELS = {
     "ready": "Ready",
@@ -154,6 +157,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
         self.last_run_dir: Path | None = None
         self.last_html: Path | None = None
         self.last_xlsx: Path | None = None
+        self.last_diagnostic_json: Path | None = None
 
         self.host_var = tk.StringVar()
         self.name_var = tk.StringVar()
@@ -165,7 +169,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
         self.output_dir_var = tk.StringVar(value=str(default_gui_output_dir()))
         self.role_networks_path_var = tk.StringVar()
         self.timeout_var = tk.IntVar(value=60)
-        self.status_var = tk.StringVar(value="대기 중")
+        self.status_var = tk.StringVar(value="Ready")
         self.stage_var = tk.StringVar(value=STAGE_LABELS["ready"])
 
         self._style()
@@ -295,7 +299,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
         self._section_label(form, "Connection")
         self._notice(form, WLC_TARGET_NOTICE)
         self._entry(form, WLC_IP_LABEL, self.host_var)
-        self._entry(form, REPORT_NAME_LABEL, self.name_var, hint="비워두면 wlc-IP 형식으로 자동 지정됩니다.")
+        self._entry(form, REPORT_NAME_LABEL, self.name_var, hint="Leave blank to use the wlc-IP name format.")
         self._protocol_row(form)
 
         self._section_label(form, "Authentication")
@@ -307,7 +311,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
         output_row = tk.Frame(form, bg=PANEL_BG)
         output_row.pack(fill="x", pady=(4, 8))
         ttk.Entry(output_row, textvariable=self.output_dir_var, width=34).pack(side="left", fill="x", expand=True)
-        ttk.Button(output_row, text="찾기", style="Soft.TButton", command=self._browse_output).pack(
+        ttk.Button(output_row, text="Browse", style="Soft.TButton", command=self._browse_output).pack(
             side="left", padx=(8, 0)
         )
         self._section_label(form, "Options")
@@ -334,7 +338,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
         tk.Label(top, text="read-only command trace", bg=PANEL_BG, fg=MUTED_COLOR, font=("Segoe UI", 9)).pack(
             side="left", padx=(8, 0)
         )
-        ttk.Button(top, text="지우기", style="Soft.TButton", command=self._clear_log).pack(side="right")
+        ttk.Button(top, text="Clear", style="Soft.TButton", command=self._clear_log).pack(side="right")
         self.log_text = tk.Text(
             log_panel,
             height=20,
@@ -413,10 +417,23 @@ class WlcRoleAclCollectorGui(tk.Tk):
         )
         actions = tk.Frame(parent, bg=PANEL_BG)
         actions.pack(fill="x", pady=(12, 0))
-        actions.grid_columnconfigure(0, weight=1)
+        actions.grid_columnconfigure(0, weight=1, uniform="primary_actions")
+        actions.grid_columnconfigure(1, weight=1, uniform="primary_actions")
 
-        self.start_button = ttk.Button(actions, text="수집 시작", style="Accent.TButton", command=self._start_collection)
-        self.start_button.grid(row=0, column=0, sticky="ew")
+        self.start_button = ttk.Button(
+            actions,
+            text=COLLECTION_ACTION_LABEL,
+            style="Accent.TButton",
+            command=self._start_collection,
+        )
+        self.start_button.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        self.diagnostic_button = ttk.Button(
+            actions,
+            text=DIAGNOSTIC_ACTION_LABEL,
+            style="Soft.TButton",
+            command=self._start_diagnostic,
+        )
+        self.diagnostic_button.grid(row=0, column=1, sticky="ew", padx=(6, 0))
 
         outputs = tk.Frame(parent, bg=PANEL_BG)
         outputs.pack(fill="x", pady=(8, 0))
@@ -425,15 +442,15 @@ class WlcRoleAclCollectorGui(tk.Tk):
         outputs.grid_columnconfigure(2, weight=1, uniform="result_actions")
 
         self.open_folder_button = ttk.Button(
-            outputs, text="결과 폴더", style="Soft.TButton", command=self._open_output_folder, state="disabled"
+            outputs, text="Open Folder", style="Soft.TButton", command=self._open_output_folder, state="disabled"
         )
         self.open_folder_button.grid(row=0, column=0, sticky="ew", padx=(0, 6))
         self.open_html_button = ttk.Button(
-            outputs, text="HTML 열기", style="Soft.TButton", command=self._open_html, state="disabled"
+            outputs, text="Open HTML", style="Soft.TButton", command=self._open_html, state="disabled"
         )
         self.open_html_button.grid(row=0, column=1, sticky="ew", padx=6)
         self.open_xlsx_button = ttk.Button(
-            outputs, text="Excel 열기", style="Soft.TButton", command=self._open_xlsx, state="disabled"
+            outputs, text="Open Excel", style="Soft.TButton", command=self._open_xlsx, state="disabled"
         )
         self.open_xlsx_button.grid(row=0, column=2, sticky="ew", padx=(6, 0))
 
@@ -520,12 +537,12 @@ class WlcRoleAclCollectorGui(tk.Tk):
         input_row = tk.Frame(row, bg=PANEL_BG)
         input_row.pack(fill="x", pady=(3, 0))
         ttk.Entry(input_row, textvariable=self.role_networks_path_var, width=34).pack(side="left", fill="x", expand=True)
-        ttk.Button(input_row, text="찾기", style="Soft.TButton", command=self._browse_role_networks).pack(
+        ttk.Button(input_row, text="Browse", style="Soft.TButton", command=self._browse_role_networks).pack(
             side="left", padx=(8, 0)
         )
         ttk.Label(
             row,
-            text="선택 사항입니다. 실행 중에만 읽고 보안모드에서는 HTML/Excel에 저장하지 않습니다.",
+            text="Optional. Loaded in memory for this run only and not exported unless explicitly enabled.",
             style="Muted.TLabel",
             wraplength=295,
         ).pack(anchor="w", pady=(3, 0))
@@ -585,7 +602,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
             target = build_target_from_gui_input(self._read_form())
             timeout = self._read_timeout()
         except ValueError as exc:
-            messagebox.showerror("입력 오류", str(exc))
+            messagebox.showerror("Input error", str(exc))
             return
 
         try:
@@ -603,6 +620,26 @@ class WlcRoleAclCollectorGui(tk.Tk):
         self.worker = threading.Thread(
             target=self._run_collection_worker,
             args=(target, output_dir, timeout, role_networks),
+            daemon=True,
+        )
+        self.worker.start()
+
+    def _start_diagnostic(self) -> None:
+        if self.is_running:
+            return
+        try:
+            target = build_target_from_gui_input(self._read_form())
+            timeout = self._read_timeout()
+        except ValueError as exc:
+            messagebox.showerror("Input error", str(exc))
+            return
+
+        output_dir = Path(self.output_dir_var.get().strip() or "outputs")
+        self._set_running(True)
+        self._log("Starting safe diagnostic")
+        self.worker = threading.Thread(
+            target=self._run_diagnostic_worker,
+            args=(target, output_dir, timeout),
             daemon=True,
         )
         self.worker.start()
@@ -710,6 +747,38 @@ class WlcRoleAclCollectorGui(tk.Tk):
                 )
             )
 
+    def _run_diagnostic_worker(self, target, output_dir: Path, timeout: int) -> None:
+        try:
+            self.event_queue.put(("stage", "connecting"))
+            self.event_queue.put(("status", "Running safe diagnostic"))
+            self.event_queue.put(("log", "Safe diagnostic mode does not save raw device output."))
+            diagnostic = run_diagnostic(target, output_root=output_dir, timeout=timeout)
+            for line in format_diagnostic_progress(diagnostic.primary_code, diagnostic.report_paths, diagnostic.events):
+                self.event_queue.put(("log", line))
+            self.event_queue.put(
+                (
+                    "diagnostic_done",
+                    {
+                        "run_dir": diagnostic.run_dir,
+                        "html": diagnostic.report_paths.get("html"),
+                        "json": diagnostic.report_paths.get("json"),
+                        "primary_code": diagnostic.primary_code,
+                    },
+                )
+            )
+        except Exception as exc:
+            failure = classify_error_message(str(exc))
+            self.event_queue.put(
+                (
+                    "error",
+                    {
+                        "message": failure.as_text(),
+                        "run_dir": output_dir,
+                        "run_log": None,
+                    },
+                )
+            )
+
     def _drain_events(self) -> None:
         try:
             while True:
@@ -731,7 +800,26 @@ class WlcRoleAclCollectorGui(tk.Tk):
                     self._set_stage("completed")
                     self._set_running(False)
                     self._set_result_buttons(folder_enabled=True, report_enabled=True)
-                    messagebox.showinfo("완료", "보고서 생성이 완료되었습니다.")
+                    messagebox.showinfo("Completed", "Report generation completed.")
+                elif event == "diagnostic_done":
+                    paths = payload
+                    primary_code = str(paths.get("primary_code", "WLC-UNK-001"))
+                    self.last_run_dir = paths["run_dir"]
+                    self.last_html = paths.get("html")
+                    self.last_xlsx = None
+                    self.last_diagnostic_json = paths.get("json")
+                    self.status_var.set(f"Diagnostic completed: {primary_code}")
+                    self._set_stage("completed" if primary_code == "OK" else "failed")
+                    self._set_running(False)
+                    self._set_result_buttons(folder_enabled=True, report_enabled=True, xlsx_enabled=False)
+                    message = (
+                        f"Safe diagnostic completed.\nPrimary code: {primary_code}\n\n"
+                        "Share only the primary code and diagnostic summary files."
+                    )
+                    if primary_code == "OK":
+                        messagebox.showinfo("Diagnostic completed", message)
+                    else:
+                        messagebox.showwarning("Diagnostic completed with code", message)
                 elif event == "error":
                     self._set_stage("failed")
                     if isinstance(payload, dict):
@@ -749,7 +837,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
                         self._set_result_buttons(folder_enabled=False, report_enabled=False)
                     self.status_var.set("Failed")
                     self._set_running(False)
-                    messagebox.showerror("실행 오류", message)
+                    messagebox.showerror("Run error", message)
         except queue.Empty:
             pass
         self.after(150, self._drain_events)
@@ -757,6 +845,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
     def _set_running(self, running: bool) -> None:
         self.is_running = running
         self.start_button.configure(state="disabled" if running else "normal")
+        self.diagnostic_button.configure(state="disabled" if running else "normal")
         if running:
             self._set_stage("connecting")
             self._set_result_buttons(folder_enabled=False, report_enabled=False)
@@ -764,10 +853,18 @@ class WlcRoleAclCollectorGui(tk.Tk):
             if self.stage_var.get() not in {STAGE_LABELS["completed"], STAGE_LABELS["failed"]}:
                 self._set_stage("ready")
 
-    def _set_result_buttons(self, *, folder_enabled: bool, report_enabled: bool) -> None:
+    def _set_result_buttons(
+        self,
+        *,
+        folder_enabled: bool,
+        report_enabled: bool,
+        xlsx_enabled: bool | None = None,
+    ) -> None:
+        if xlsx_enabled is None:
+            xlsx_enabled = report_enabled
         self.open_folder_button.configure(state="normal" if folder_enabled else "disabled")
         self.open_html_button.configure(state="normal" if report_enabled else "disabled")
-        self.open_xlsx_button.configure(state="normal" if report_enabled else "disabled")
+        self.open_xlsx_button.configure(state="normal" if xlsx_enabled else "disabled")
 
     def _log(self, text: str) -> None:
         self.log_text.configure(state="normal")
@@ -799,9 +896,11 @@ def _log_tag_for_line(text: str) -> str:
         return "error"
     if normalized.startswith("warning:"):
         return "warning"
-    if normalized.startswith(("done:", "connect ok:", "commands complete:", "excel:", "html:", "raw saved:")):
+    if normalized.startswith(
+        ("done:", "connect ok:", "commands complete:", "excel:", "html:", "raw saved:", "diagnostic html:")
+    ):
         return "success"
-    if normalized.startswith(("connect:", "start:", "roles:", "aliases:")) or "building" in normalized:
+    if normalized.startswith(("connect:", "start:", "roles:", "aliases:", "diag:")) or "building" in normalized:
         return "info"
     if normalized.startswith(("run log:", "controller:", "wlc ip:", "protocol:", "port:", "timeout")):
         return "muted"
@@ -827,40 +926,59 @@ def format_collection_progress(event: str, payload: dict[str, object]) -> tuple[
         return f"Login succeeded: {host}", [f"CONNECT OK: {host}"]
     if event == "command_start":
         if alias:
-            status = f"Alias {index}/{total} 수집 중: {alias}"
+            status = f"Collecting alias {index}/{total}: {alias}"
         elif role:
-            status = f"Role {index}/{total} 수집 중: {role}"
+            status = f"Collecting role {index}/{total}: {role}"
         else:
-            status = f"{command} 실행 중... 최대 {timeout}초 대기"
+            status = f"Running {command}; waiting up to {timeout} seconds"
         return status, [f"START: {command_id} | {command}"]
     if event == "command_done":
         size = payload.get("output_length", 0)
         if alias:
-            status = f"Alias {index}/{total} 완료: {alias}"
+            status = f"Alias {index}/{total} completed: {alias}"
         elif role:
-            status = f"Role {index}/{total} 완료: {role}"
+            status = f"Role {index}/{total} completed: {role}"
         else:
-            status = f"{command} 완료"
+            status = f"{command} completed"
         return status, [f"DONE: {command_id} | {command} | {size} chars"]
     if event == "command_error":
         error = payload.get("error", "")
         if alias:
-            status = f"Alias {index}/{total} 실패: {alias}"
+            status = f"Alias {index}/{total} failed: {alias}"
         elif role:
-            status = f"Role {index}/{total} 실패: {role}"
+            status = f"Role {index}/{total} failed: {role}"
         else:
-            status = f"{command or command_id} 실패"
+            status = f"{command or command_id} failed"
         return status, [f"ERROR: {command_id} | {command} | {error}"]
     if event == "aliases_discovered":
         total = payload.get("total", 0)
-        return f"Alias {total}개 발견", [f"ALIASES: discovered {total} netdestination alias(es)"]
+        return f"Discovered {total} alias(es)", [f"ALIASES: discovered {total} netdestination alias(es)"]
     if event == "roles_discovered":
         total = payload.get("total", 0)
-        return f"Role {total}개 발견", [f"ROLES: discovered {total} role(s)"]
+        return f"Discovered {total} role(s)", [f"ROLES: discovered {total} role(s)"]
     if event == "complete":
         count = payload.get("command_count", 0)
         return "Collection commands completed", [f"COMMANDS COMPLETE: {count} command result(s)"]
     return "", []
+
+
+def format_diagnostic_progress(primary_code: str, report_paths: dict[str, Path], events: list[object]) -> list[str]:
+    lines = [f"Diagnostic primary code: {primary_code}"]
+    for event in events:
+        stage = getattr(event, "stage", "")
+        status = getattr(event, "status", "")
+        code = getattr(event, "code", "")
+        command_id = getattr(event, "command_id", "")
+        if code == "OK":
+            code = ""
+        parts = [part for part in (stage, status.upper(), code, command_id) if part]
+        if parts:
+            lines.append("DIAG: " + " | ".join(parts))
+    if report_paths.get("json"):
+        lines.append(f"Diagnostic JSON: {report_paths['json']}")
+    if report_paths.get("html"):
+        lines.append(f"Diagnostic HTML: {report_paths['html']}")
+    return lines
 
 
 def _collection_failure_message(base_message: str, result: CollectionResult | None, run_log: Path | None) -> str:

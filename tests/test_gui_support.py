@@ -1,4 +1,6 @@
 from wlc_role_acl_collector.gui_app import (
+    COLLECTION_ACTION_LABEL,
+    DIAGNOSTIC_ACTION_LABEL,
     REPORT_NAME_LABEL,
     STAGE_LABELS,
     STAGE_PROGRESS,
@@ -9,7 +11,9 @@ from wlc_role_acl_collector.gui_app import (
     _log_tag_for_line,
     _write_run_log,
     format_collection_progress,
+    format_diagnostic_progress,
 )
+from wlc_role_acl_collector.diagnostic_events import event_from_code, safe_info_event
 from wlc_role_acl_collector.gui_support import (
     GuiConnectionInput,
     build_target_from_gui_input,
@@ -27,7 +31,7 @@ def test_gui_app_importable():
 
 def test_gui_notice_tells_user_to_connect_to_wlc_not_mm():
     assert "Mobility Master(MM)" in WLC_TARGET_NOTICE
-    assert "WLC 컨트롤러" in WLC_TARGET_NOTICE
+    assert "WLC controller IP" in WLC_TARGET_NOTICE
     assert "Hostname" not in WLC_TARGET_NOTICE
 
 
@@ -56,10 +60,17 @@ def test_gui_stage_labels_support_operational_console_flow():
     }
 
 
+def test_gui_actions_include_safe_diagnostic_button():
+    assert COLLECTION_ACTION_LABEL == "Start Collection"
+    assert DIAGNOSTIC_ACTION_LABEL == "Safe Diagnostic"
+
+
 def test_log_tag_for_line_classifies_operational_log_levels():
     assert _log_tag_for_line("ERROR: Authentication failed") == "error"
     assert _log_tag_for_line("DONE: configuration_effective | show configuration effective | 100 chars") == "success"
     assert _log_tag_for_line("START: rights::corp | show rights corp") == "info"
+    assert _log_tag_for_line("DIAG: DGN-CMD | OK") == "info"
+    assert _log_tag_for_line("Diagnostic HTML: C:\\temp\\diagnostic_summary.html") == "success"
     assert _log_tag_for_line("WLC IP: 10.10.10.10") == "muted"
 
 
@@ -151,7 +162,7 @@ def test_format_collection_progress_for_role_command():
         },
     )
 
-    assert status == "Role 2/5 수집 중: corp-employee"
+    assert status == "Collecting role 2/5: corp-employee"
     assert lines == ["START: rights::corp-employee | show rights corp-employee"]
 
 
@@ -179,3 +190,23 @@ def test_collection_failure_message_includes_failed_command_and_run_log(tmp_path
     assert "Failed command: configuration_effective" in message
     assert "Command: show configuration effective" in message
     assert str(run_log) in message
+
+
+def test_format_diagnostic_progress_summarizes_code_stage_and_reports(tmp_path):
+    lines = format_diagnostic_progress(
+        "WLC-CMD-001",
+        {
+            "json": tmp_path / "diagnostic_summary.json",
+            "html": tmp_path / "diagnostic_summary.html",
+        },
+        [
+            safe_info_event("DGN-BOOT", "Diagnostic mode started."),
+            event_from_code("WLC-CMD-001", command_id="configuration_effective"),
+        ],
+    )
+
+    assert lines[0] == "Diagnostic primary code: WLC-CMD-001"
+    assert "DIAG: DGN-BOOT | OK" in lines
+    assert "DIAG: DGN-CMD | ERROR | WLC-CMD-001 | configuration_effective" in lines
+    assert any(line.startswith("Diagnostic JSON:") for line in lines)
+    assert any(line.startswith("Diagnostic HTML:") for line in lines)

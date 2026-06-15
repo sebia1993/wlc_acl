@@ -94,8 +94,11 @@ wlc_role_acl_collector/
 - SSH/Telnet 선택 시 기본 포트 자동 변경
 - Role network Excel 선택
 - 수집 시작 버튼 처리
+- 안전 진단 버튼 처리
 - 백그라운드 스레드에서 수집 실행
+- 백그라운드 스레드에서 원본 raw 저장 없는 진단 실행
 - 완료 후 HTML/Excel 열기 버튼 활성화
+- 진단 완료 후 진단 HTML과 결과 폴더 열기 버튼 활성화
 - 오류 발생 시 메시지 박스 표시
 - 장비 접속 대상은 MM이 아니라 실제 WLC 컨트롤러라는 안내 표시
 - 정책 운영형 콘솔 디자인, 상태 단계 표시, 로그 색상 태그 표시
@@ -105,6 +108,7 @@ wlc_role_acl_collector/
 - GUI가 멈추지 않도록 수집 작업은 별도 스레드에서 실행합니다.
 - 비밀번호는 파일에 저장하지 않습니다.
 - Role network Excel 경로와 내부 대역은 run.log에 남기지 않습니다.
+- 진단 모드는 `diagnostic_summary.json/html`, `diagnostic_run.log`만 생성하고 raw 폴더를 만들지 않습니다.
 - Windows 다중 모니터와 DPI 배율 차이를 고려해 창 위치/크기를 작업영역 안으로 보정합니다.
 - GUI 색상, 단계 라벨, 주요 문구는 `gui_app.py` 상단 상수에서 관리합니다.
 

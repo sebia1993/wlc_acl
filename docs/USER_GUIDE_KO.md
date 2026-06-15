@@ -55,12 +55,20 @@ Excel 파일은 실제 `.xlsx` 또는 `.xlsm` 형식이어야 합니다. CSV나 
 2. `WlcRoleAclCollectorGUI.exe`를 실행합니다.
 3. Windows SmartScreen 경고가 나오면 회사 보안 정책에 따라 실행 여부를 확인합니다.
 
+ZIP에는 GUI 실행 파일과 콘솔 실행 파일이 함께 포함됩니다.
+
+- `WlcRoleAclCollectorGUI.exe`: 일반 수집용 Windows 화면
+- `WlcRoleAclCollectorCLI.exe`: 진단 모드와 mock 서버 실행용 콘솔 도구
+
 ZIP 안에는 설명서가 두 가지 형식으로 포함됩니다.
 
 - `USER_GUIDE_KO.html`: 브라우저로 바로 열어 보기 좋은 사용자 설명서
 - `USER_GUIDE_KO.md`: Markdown 원본 설명서
 - `DEVELOPER_GUIDE_KO.html`: 브라우저로 바로 열어 보기 좋은 개발자 설명서
 - `DEVELOPER_GUIDE_KO.md`: Markdown 원본 개발자 설명서
+- `ERROR_CODES_KO.html` / `ERROR_CODES_KO.md`: 외부 공유 가능한 오류 코드 설명
+- `DIAGNOSTIC_MODE_KO.html` / `DIAGNOSTIC_MODE_KO.md`: 원본 로그 없는 현장 진단 모드 설명
+- `SECURITY_MODEL_KO.html` / `SECURITY_MODEL_KO.md`: 민감정보 저장/마스킹 기준
 
 소스 코드 상태에서 실행하는 경우:
 
@@ -206,7 +214,38 @@ python -m wlc_role_acl_collector collect --role-networks config\role_networks.ex
 | 보고서에 Role이 부족함 | 해당 Role의 `show rights <role>` 명령 권한 또는 수집 로그 확인 |
 | Access Check 결과가 예상과 다름 | Service 선택 여부, Alias 상세 수집 여부, 숨겨진 other ACL 표시 여부 확인 |
 
-## 12. 산출물 취급 주의
+## 12. 진단 모드와 오류 코드
+
+현장에서 문제가 발생했지만 원본 로그를 외부로 가져올 수 없는 경우 진단 모드를 사용합니다.
+
+```powershell
+WlcRoleAclCollectorCLI.exe diagnose --controllers config\controllers.example.csv --output-dir outputs
+```
+
+진단 모드는 아래 파일을 생성합니다.
+
+- `diagnostic_summary.json`
+- `diagnostic_summary.html`
+- `diagnostic_run.log`
+
+진단 파일에는 원본 장비 출력 대신 단계, 오류 코드, command_id, 안전 메시지만 저장합니다.
+
+외부 분석 요청 시에는 먼저 아래 값만 전달합니다.
+
+- `primary_code`
+- `stage`
+- `command_id`
+- `raw_output_saved`
+
+오류 코드별 의미는 `ERROR_CODES_KO.html`에서 확인합니다.
+
+실제 장비 없이 개발 PC에서 동작 확인이 필요하면 mock 서버를 사용할 수 있습니다.
+
+```powershell
+WlcRoleAclCollectorCLI.exe mock-server --protocol telnet --scenario config\mock_scenarios\success_minimal.json
+```
+
+## 13. 산출물 취급 주의
 
 다음 파일은 내부 정보가 포함될 수 있습니다.
 
@@ -218,7 +257,7 @@ python -m wlc_role_acl_collector collect --role-networks config\role_networks.ex
 
 외부 공유 전에는 ACL, Alias, Controller 이름, 내부 IP, 정책명, 주석 내용을 반드시 확인하십시오.
 
-## 13. 문제가 생겼을 때 전달하면 좋은 정보
+## 14. 문제가 생겼을 때 전달하면 좋은 정보
 
 개발자나 담당자에게 문의할 때는 아래 정보를 전달하면 원인 확인이 빠릅니다.
 
@@ -227,5 +266,6 @@ python -m wlc_role_acl_collector collect --role-networks config\role_networks.ex
 - 오류 메시지 전체
 - `run.log`
 - 어느 단계에서 멈췄는지: 접속, 명령 수집, 보고서 생성, HTML 확인
+- 진단 모드를 실행한 경우 `primary_code`, `stage`, `command_id`
 
 비밀번호와 Role network Excel 원본은 전달하지 마십시오.

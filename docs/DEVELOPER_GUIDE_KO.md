@@ -67,6 +67,13 @@ wlc_role_acl_collector/
     report.py           Excel/HTML 보고서 생성
     role_networks.py    Role network Excel 로드 및 검증
     diagnostics.py      실패 메시지 분류와 사용자용 오류 설명
+    diagnostic_codes.py 안정적인 오류 코드 정의
+    diagnostic_events.py 원본 없는 단계 이벤트 모델
+    diagnostic_mode.py  현장 진단 모드 실행 흐름
+    diagnostic_report.py 안전 진단 JSON/HTML/log 생성
+    redaction.py        민감정보 자동 마스킹
+    mock_server.py      로컬 SSH/Telnet mock WLC 서버
+    mock_scenarios.py   mock 응답 시나리오 로더
     config.py           CSV/환경변수 기반 설정 로드
     models.py           공통 dataclass 모델
   tests/                자동 테스트
@@ -254,6 +261,22 @@ Service 미선택 동작:
 
 오류 메시지를 개선하고 싶으면 이 파일을 보면 됩니다.
 
+### 진단 모드 관련 파일
+
+진단 모드는 실제 장비 원본 출력 없이 오류 코드와 단계 상태만 저장합니다.
+
+- `diagnostic_codes.py`: `WLC-영역-번호` 코드, 단계, 원인, 조치 정의
+- `diagnostic_events.py`: `DGN-*` 단계 이벤트 모델
+- `diagnostic_mode.py`: live/offline 진단 실행과 primary code 결정
+- `diagnostic_report.py`: `diagnostic_summary.json/html`, `diagnostic_run.log` 생성
+- `redaction.py`: IP, MAC, 호스트명, secret 계열 값 마스킹
+
+mock 관련 파일:
+
+- `mock_scenarios.py`: JSON 시나리오 로드
+- `mock_server.py`: 로컬 Telnet/SSH mock WLC 서버
+- `config/mock_scenarios/*.json`: 실제 장비 출력이 아닌 synthetic 응답
+
 ## 6. 요구사항별 수정 위치
 
 | 요구사항 | 주로 수정할 파일 |
@@ -266,6 +289,8 @@ Service 미선택 동작:
 | Access Check 판단 로직 변경 | `acl_evaluator.py`, `tests/test_acl_evaluator.py` |
 | Role network Excel 형식 변경 | `role_networks.py`, `tests/test_role_networks.py` |
 | 오류 메시지 개선 | `diagnostics.py`, `tests/test_diagnostics.py` |
+| 진단 코드/리포트 변경 | `diagnostic_codes.py`, `diagnostic_mode.py`, `diagnostic_report.py`, `tests/test_diagnostic_*.py` |
+| mock 서버/시나리오 변경 | `mock_server.py`, `mock_scenarios.py`, `config/mock_scenarios`, `tests/test_mock_server.py` |
 | 배포 ZIP 구성 변경 | `build_windows_gui_exe.ps1`, `tests/test_tooling.py` |
 | 사용자 문서 변경 | `docs/USER_GUIDE_KO.md` |
 | 개발자 문서 변경 | `docs/DEVELOPER_GUIDE_KO.md` |
@@ -321,17 +346,23 @@ Windows GUI EXE와 ZIP 생성:
 
 ```text
 dist\WlcRoleAclCollectorGUI.exe
+dist\WlcRoleAclCollectorCLI.exe
 dist\WlcRoleAclCollectorGUI_v0.1.0.zip
 ```
 
 ZIP에는 다음 파일이 포함됩니다.
 
 - `WlcRoleAclCollectorGUI.exe`
+- `WlcRoleAclCollectorCLI.exe`
 - `USER_GUIDE_KO.md`
 - `USER_GUIDE_KO.html`
 - `DEVELOPER_GUIDE_KO.md`
 - `DEVELOPER_GUIDE_KO.html`
+- `ERROR_CODES_KO.md/html`
+- `DIAGNOSTIC_MODE_KO.md/html`
+- `SECURITY_MODEL_KO.md/html`
 - `config\role_networks.example.xlsx`
+- `config\mock_scenarios\*.json`
 
 HTML 설명서는 빌드 중 `tools\generate_doc_html.py`가 Markdown 원본에서 자동 생성합니다. 문서를 수정했다면 빌드 전이나 검증 전 아래 명령으로 직접 생성해볼 수 있습니다.
 

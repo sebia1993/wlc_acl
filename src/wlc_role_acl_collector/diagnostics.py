@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .diagnostic_codes import classify_message_to_code
 from .models import CollectionResult
 
 
@@ -11,12 +12,14 @@ class FailureInfo:
     title: str
     detail: str
     suggestion: str
+    code: str = "WLC-UNK-001"
 
     def as_text(self) -> str:
         return f"{self.title}\n\n{self.detail}\n\n{self.suggestion}"
 
 
 def classify_error_message(message: str) -> FailureInfo:
+    diagnostic_code = classify_message_to_code(message)
     normalized = message.lower()
 
     if any(token in normalized for token in ("authentication", "auth", "password", "login failed")):
@@ -28,6 +31,7 @@ def classify_error_message(message: str) -> FailureInfo:
                 "Check the username/password, account lock status, and whether this account is "
                 "allowed to log in to the WLC over the selected protocol."
             ),
+            code=diagnostic_code.code,
         )
 
     if any(
@@ -51,6 +55,7 @@ def classify_error_message(message: str) -> FailureInfo:
                 "Check the WLC IP, protocol, port, routing, firewall, and whether SSH/Telnet "
                 "is enabled on the controller."
             ),
+            code=diagnostic_code.code,
         )
 
     if any(token in normalized for token in ("show configuration effective", "invalid input", "permission", "denied")):
@@ -62,6 +67,7 @@ def classify_error_message(message: str) -> FailureInfo:
                 "Check whether the account has permission to run 'show configuration effective' "
                 "and 'show rights <role>' on this WLC."
             ),
+            code=diagnostic_code.code,
         )
 
     return FailureInfo(
@@ -69,6 +75,7 @@ def classify_error_message(message: str) -> FailureInfo:
         title="Collection failed",
         detail=message or "The collection failed before a report could be generated.",
         suggestion="Open the raw/log files in the result folder and check the exact device response.",
+        code=diagnostic_code.code,
     )
 
 

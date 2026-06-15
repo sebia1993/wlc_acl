@@ -1,0 +1,8 @@
+{
+  "name": "auth_failed",
+  "prompt": "(mock-wlc) #",
+  "login": "auth_failed",
+  "commands": {
+    "no paging": ""
+  }
+}

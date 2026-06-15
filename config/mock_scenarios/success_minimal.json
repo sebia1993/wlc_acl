@@ -1,0 +1,15 @@
+{
+  "name": "success_minimal",
+  "prompt": "(mock-wlc) #",
+  "login": "success",
+  "commands": {
+    "no paging": "",
+    "show clock": "Mon Jun 15 10:00:00 2026",
+    "show version": "ArubaOS (MODEL: MOCK-WLC), Version 8.10.0.0",
+    "show configuration effective": "ap-group \"LAB-AP\"\n    virtual-ap \"guest-vap\"\n!\nwlan virtual-ap \"guest-vap\"\n    ssid-profile \"guest-ssid-profile\"\n    aaa-profile \"guest-aaa\"\n    vlan 30\n    forward-mode tunnel\n!\nwlan ssid-profile \"guest-ssid-profile\"\n    essid \"GUEST-LAB\"\n    opmode opensystem\n!\naaa profile \"guest-aaa\"\n    initial-role \"guest-logon\"\n    mac-default-role \"guest-logon\"\n!\nuser-role \"guest-logon\"\n    access-list session \"guest-logon\"\n!\ninterface vlan 30\n    ip address 192.0.2.30 255.255.255.0\n!\nip access-list session \"guest-logon\"\n    user any svc-dhcp permit\n    user any svc-dns permit\n    user alias controller svc-https dst-nat 8081\n!\nnetdestination \"controller\"\n    host 192.0.2.1\n!",
+    "show ip interface brief": "Interface  IP Address / IP Netmask     Admin  Protocol  VRRP-IP\n---------  -------------------------   -----  --------  -------\nvlan 30    192.0.2.30 / 255.255.255.0  Up     Up        0.0.0.0",
+    "show user-table": "Users\n-----\n192.0.2.101 aa:bb:cc:00:00:01 guest-user-1 role guest-logon vlan 30 essid GUEST-LAB",
+    "show netdestination controller": "Name: controller\nhost 192.0.2.1",
+    "show rights guest-logon": "Derived Role = guest-logon\nguest-logon\n    user any svc-dhcp permit\n    user any svc-dns permit\n    user alias controller svc-https dst-nat 8081"
+  }
+}

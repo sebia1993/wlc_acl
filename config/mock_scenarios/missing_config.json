@@ -1,0 +1,13 @@
+{
+  "name": "missing_config",
+  "prompt": "(mock-wlc) #",
+  "login": "success",
+  "commands": {
+    "no paging": "",
+    "show clock": "Mon Jun 15 10:00:00 2026",
+    "show version": "ArubaOS (MODEL: MOCK-WLC), Version 8.10.0.0",
+    "show configuration effective": "",
+    "show ip interface brief": "",
+    "show user-table": ""
+  }
+}

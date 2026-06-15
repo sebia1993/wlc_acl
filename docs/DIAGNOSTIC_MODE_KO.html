@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WLC Role ACL Collector 진단 모드</title>
+  <style>
+    :root {
+      --bg: #f3f6fa;
+      --panel: #ffffff;
+      --text: #172033;
+      --muted: #667085;
+      --line: #d6dde7;
+      --accent: #0f6cbd;
+      --code-bg: #111827;
+      --code-text: #e5edf7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", "Malgun Gothic", Arial, sans-serif;
+      line-height: 1.65;
+      margin: 0;
+      padding: 24px;
+    }
+    main {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+      margin: 0 auto;
+      max-width: 1120px;
+      padding: 34px;
+    }
+    h1, h2, h3 { line-height: 1.3; }
+    h1 {
+      border-bottom: 3px solid var(--accent);
+      font-size: 28px;
+      margin: 0 0 24px;
+      padding-bottom: 14px;
+    }
+    h2 {
+      border-top: 1px solid var(--line);
+      font-size: 22px;
+      margin: 34px 0 14px;
+      padding-top: 24px;
+    }
+    h3 { font-size: 18px; margin: 24px 0 10px; }
+    p { margin: 10px 0; }
+    a { color: var(--accent); }
+    ul, ol { padding-left: 24px; }
+    li { margin: 5px 0; }
+    code {
+      background: #eef3f8;
+      border: 1px solid #d8e2ed;
+      border-radius: 5px;
+      font-family: Consolas, "Cascadia Mono", monospace;
+      padding: 1px 5px;
+    }
+    pre {
+      background: var(--code-bg);
+      border-radius: 8px;
+      color: var(--code-text);
+      overflow-x: auto;
+      padding: 14px 16px;
+    }
+    pre code {
+      background: transparent;
+      border: 0;
+      color: inherit;
+      padding: 0;
+    }
+    table {
+      border-collapse: collapse;
+      margin: 14px 0 22px;
+      width: 100%;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #edf4fb; }
+    blockquote {
+      border-left: 4px solid var(--accent);
+      color: var(--muted);
+      margin: 14px 0;
+      padding: 4px 0 4px 14px;
+    }
+    .generated-note {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 34px;
+    }
+    @media print {
+      body { background: #ffffff; padding: 0; }
+      main { border: 0; box-shadow: none; max-width: none; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>WLC Role ACL Collector 진단 모드</h1>
+    <p>진단 모드는 회사 내부망 PC에서 실행해도 원본 장비 출력을 저장하지 않는 확인 모드입니다.</p>
+    <h2>실행 방식</h2>
+    <p>CLI에서 실행:</p>
+    <pre><code>WlcRoleAclCollectorCLI.exe diagnose --controllers config\controllers.example.csv --output-dir outputs</code></pre>
+    <p>Python 소스 환경에서 실행:</p>
+    <pre><code>python -m wlc_role_acl_collector diagnose --controllers config\controllers.example.csv --output-dir outputs</code></pre>
+    <h2>산출물</h2>
+    <pre><code>outputs\&lt;timestamp&gt;\
+  diagnostic_summary.json
+  diagnostic_summary.html
+  diagnostic_run.log</code></pre>
+    <p>진단 산출물에는 다음을 저장하지 않습니다.</p>
+    <ul>
+      <li>원본 장비 명령 출력</li>
+      <li>실제 IP 주소</li>
+      <li>실제 호스트명</li>
+      <li>계정, 비밀번호, secret, token</li>
+      <li>사용자 MAC 주소</li>
+    </ul>
+    <h2>단계</h2>
+    <table>
+      <thead><tr><th>단계</th><th>의미</th></tr></thead>
+      <tbody>
+      <tr><td>DGN-BOOT</td><td>프로그램 실행 환경 확인</td></tr>
+      <tr><td>DGN-INPUT</td><td>입력값 검증</td></tr>
+      <tr><td>DGN-NET</td><td>TCP 연결 시도</td></tr>
+      <tr><td>DGN-AUTH</td><td>로그인 결과</td></tr>
+      <tr><td>DGN-PROMPT</td><td>프롬프트 탐지</td></tr>
+      <tr><td>DGN-CMD</td><td>필수 명령 실행</td></tr>
+      <tr><td>DGN-PARSE</td><td>Role/ACL/Alias 파싱</td></tr>
+      <tr><td>DGN-REPORT</td><td>안전 진단 리포트 생성</td></tr>
+      <tr><td>DGN-SEC</td><td>민감정보 마스킹 self-test</td></tr>
+      </tbody>
+    </table>
+    <h2>Mock 서버 사용</h2>
+    <p>실제 장비 없이 개발 PC에서 테스트할 때:</p>
+    <pre><code>WlcRoleAclCollectorCLI.exe mock-server --protocol telnet --scenario config\mock_scenarios\success_minimal.json</code></pre>
+    <p>다른 터미널에서 해당 로컬 포트를 대상으로 수집 또는 진단을 실행합니다.</p>
+    <p class="generated-note">Generated from Markdown for browser viewing.</p>
+  </main>
+</body>
+</html>

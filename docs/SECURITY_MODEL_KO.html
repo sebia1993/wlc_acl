@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WLC Role ACL Collector 보안 모델</title>
+  <style>
+    :root {
+      --bg: #f3f6fa;
+      --panel: #ffffff;
+      --text: #172033;
+      --muted: #667085;
+      --line: #d6dde7;
+      --accent: #0f6cbd;
+      --code-bg: #111827;
+      --code-text: #e5edf7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", "Malgun Gothic", Arial, sans-serif;
+      line-height: 1.65;
+      margin: 0;
+      padding: 24px;
+    }
+    main {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+      margin: 0 auto;
+      max-width: 1120px;
+      padding: 34px;
+    }
+    h1, h2, h3 { line-height: 1.3; }
+    h1 {
+      border-bottom: 3px solid var(--accent);
+      font-size: 28px;
+      margin: 0 0 24px;
+      padding-bottom: 14px;
+    }
+    h2 {
+      border-top: 1px solid var(--line);
+      font-size: 22px;
+      margin: 34px 0 14px;
+      padding-top: 24px;
+    }
+    h3 { font-size: 18px; margin: 24px 0 10px; }
+    p { margin: 10px 0; }
+    a { color: var(--accent); }
+    ul, ol { padding-left: 24px; }
+    li { margin: 5px 0; }
+    code {
+      background: #eef3f8;
+      border: 1px solid #d8e2ed;
+      border-radius: 5px;
+      font-family: Consolas, "Cascadia Mono", monospace;
+      padding: 1px 5px;
+    }
+    pre {
+      background: var(--code-bg);
+      border-radius: 8px;
+      color: var(--code-text);
+      overflow-x: auto;
+      padding: 14px 16px;
+    }
+    pre code {
+      background: transparent;
+      border: 0;
+      color: inherit;
+      padding: 0;
+    }
+    table {
+      border-collapse: collapse;
+      margin: 14px 0 22px;
+      width: 100%;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #edf4fb; }
+    blockquote {
+      border-left: 4px solid var(--accent);
+      color: var(--muted);
+      margin: 14px 0;
+      padding: 4px 0 4px 14px;
+    }
+    .generated-note {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 34px;
+    }
+    @media print {
+      body { background: #ffffff; padding: 0; }
+      main { border: 0; box-shadow: none; max-width: none; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>WLC Role ACL Collector 보안 모델</h1>
+    <p>이 도구는 외부 개발 PC와 회사 내부망 PC를 분리해 사용하는 흐름을 전제로 합니다.</p>
+    <h2>금지 원칙</h2>
+    <ul>
+      <li>실제 장비 raw log를 외부 개발 환경으로 가져오지 않습니다.</li>
+      <li>실제 IP, 호스트명, 정책명, 사용자 정보가 포함된 파일을 외부로 공유하지 않습니다.</li>
+      <li>문제 분석 시 원본 로그 대신 오류 코드와 안전 진단 리포트를 사용합니다.</li>
+    </ul>
+    <h2>저장 정책</h2>
+    <p>일반 수집 모드는 운영 보고서를 만들기 때문에 WLC 설정, ACL, Alias 정보가 포함될 수 있습니다. 외부 공유 전 반드시 내용을 확인해야 합니다.</p>
+    <p>진단 모드는 다음 값만 저장합니다.</p>
+    <ul>
+      <li>단계명</li>
+      <li>오류 코드</li>
+      <li>command_id</li>
+      <li>안전 메시지</li>
+      <li>retry 가능 여부</li>
+    </ul>
+    <h2>마스킹 대상</h2>
+    <ul>
+      <li>IPv4 주소</li>
+      <li>MAC 주소</li>
+      <li>WLC/Controller 계열 호스트명</li>
+      <li>password, secret, token, api key, community</li>
+      <li>URL 안의 credential</li>
+      <li>네트워크 장비 설정 안의 secret/community 계열 값</li>
+    </ul>
+    <h2>개발 규칙</h2>
+    <ul>
+      <li>새 로그나 리포트를 만들 때는 allowlist 기반으로 안전 필드만 저장합니다.</li>
+      <li>원문을 저장한 뒤 나중에 지우는 방식은 사용하지 않습니다.</li>
+      <li>테스트 fixture와 mock scenario에는 실제 회사 출력이나 실제 주소를 넣지 않습니다.</li>
+    </ul>
+    <p class="generated-note">Generated from Markdown for browser viewing.</p>
+  </main>
+</body>
+</html>

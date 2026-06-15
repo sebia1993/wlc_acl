@@ -6,7 +6,9 @@ from pathlib import Path
 
 from .collector import collect_from_controller, collect_from_offline_raw
 from .config import load_controllers
+from .diagnostic_mode import run_diagnostic
 from .interactive import prompt_controller_targets
+from .mock_server import run_mock_server
 from .models import ControllerTarget
 from .report import build_parsed_controllers, timestamp_slug, write_raw_result, write_reports
 from .role_networks import RoleNetworkDefinitionError, load_role_network_definitions
@@ -41,9 +43,36 @@ def main(argv: list[str] | None = None) -> int:
         help="read raw command outputs from a fixture directory instead of connecting to WLCs",
     )
 
+    diagnose_parser = subparsers.add_parser("diagnose", help="Run field diagnostics without saving raw output")
+    diagnose_parser.add_argument("--controllers", type=Path, help="controllers CSV path")
+    diagnose_parser.add_argument("--output-dir", default=Path("outputs"), type=Path, help="diagnostic output root")
+    diagnose_parser.add_argument("--timeout", default=60, type=int, help="per-command timeout seconds")
+    diagnose_parser.add_argument(
+        "--offline-raw-dir",
+        type=Path,
+        default=None,
+        help="read offline raw fixture data for local diagnostic testing",
+    )
+
+    mock_parser = subparsers.add_parser("mock-server", help="Start a local synthetic WLC SSH/Telnet mock server")
+    mock_parser.add_argument("--protocol", choices=("ssh", "telnet"), default="telnet")
+    mock_parser.add_argument(
+        "--scenario",
+        type=Path,
+        default=Path("config/mock_scenarios/success_minimal.json"),
+        help="mock scenario JSON file",
+    )
+    mock_parser.add_argument("--host", default="127.0.0.1", help="local listen address")
+    mock_parser.add_argument("--port", type=int, default=0, help="local listen port; 0 selects a free port")
+
     args = parser.parse_args(argv)
     if args.command == "collect":
         return _collect(args)
+    if args.command == "diagnose":
+        return _diagnose(args)
+    if args.command == "mock-server":
+        run_mock_server(args.protocol, args.scenario, host=args.host, port=args.port)
+        return 0
     return 2
 
 
@@ -93,3 +122,22 @@ def _resolve_targets(args: argparse.Namespace) -> list[ControllerTarget]:
     if args.controllers:
         return [ControllerTarget(controller=controller) for controller in load_controllers(args.controllers)]
     return prompt_controller_targets()
+
+
+def _diagnose(args: argparse.Namespace) -> int:
+    targets = _resolve_targets(args)
+    exit_code = 0
+    for target in targets:
+        diagnostic = run_diagnostic(
+            target,
+            output_root=args.output_dir,
+            timeout=args.timeout,
+            offline_raw_dir=args.offline_raw_dir,
+        )
+        print(f"Diagnostic output directory: {diagnostic.run_dir}")
+        print(f"Primary code: {diagnostic.primary_code}")
+        print(f"Diagnostic JSON: {diagnostic.report_paths['json']}")
+        print(f"Diagnostic HTML: {diagnostic.report_paths['html']}")
+        if diagnostic.primary_code != "OK":
+            exit_code = 1
+    return exit_code

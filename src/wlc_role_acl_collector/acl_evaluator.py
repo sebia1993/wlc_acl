@@ -39,6 +39,8 @@ def build_access_check_data(
         role = _clean(item.get("role"))
         rules: list[dict[str, Any]] = []
         for index, row in enumerate(item.get("rows", []), start=1):
+            # Access Check는 "선택한 Role과 같은 이름의 ACL"만 평가합니다.
+            # 다른 ACL까지 섞으면 운영자가 묻는 "이 Role에서 허용되는가?"의 답이 흐려집니다.
             if not _acl_name_exactly_matches_role(role, _clean(row.get("acl"))):
                 continue
             service = _clean(row.get("service"))
@@ -86,6 +88,8 @@ def endpoint_matchers(
     value: str,
     alias_lookup: dict[str, list[dict[str, Any]]] | None = None,
 ) -> tuple[list[dict[str, Any]], list[str]]:
+    # ACL의 source/destination 표현을 공통 matcher로 바꿉니다.
+    # 이후 evaluate_access는 matcher 타입을 몰라도 IP 숫자 범위만 비교하면 됩니다.
     alias_lookup = alias_lookup or {}
     value = value.strip()
     if not value:
@@ -101,6 +105,8 @@ def endpoint_matchers(
     if keyword == "any":
         return [{"type": "any", "label": value}], []
     if keyword == "user":
+        # Aruba ACL의 user는 "현재 Role 사용자의 IP"라는 의미라 실제 대역을 코드만으로 확정할 수 없습니다.
+        # 그래서 매칭 단계에서 source/destination 방향을 함께 보고 판단합니다.
         return [{"type": "user", "label": value}], []
     if keyword == "host" and len(tokens) >= 2:
         return _host_matcher(tokens[1], value)
@@ -148,6 +154,8 @@ def evaluate_access(
     local_warnings = _local_source_warnings(role_data, source_number, source_ip)
     uncertain_rules: list[dict[str, Any]] = []
     for rule in role_data.get("rules", []):
+        # ACL은 위에서부터 처음 매칭되는 행이 결과를 결정합니다.
+        # HTML Access Check도 장비 ACL을 읽는 방식과 맞추기 위해 같은 순서를 유지합니다.
         source_result = _endpoint_matches(
             source_number,
             rule.get("sourceMatchers", []),
@@ -167,6 +175,7 @@ def evaluate_access(
                 uncertain_rules.append(rule)
             continue
 
+        # service를 비워 두면 "서비스 조건은 자동으로 맞는 규칙을 찾는다"는 사용 흐름으로 처리합니다.
         service_result = _service_matches(_clean(rule.get("service")), selected_service)
         if not service_result["matched"]:
             continue

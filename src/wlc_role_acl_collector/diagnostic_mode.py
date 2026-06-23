@@ -58,6 +58,7 @@ def run_diagnostic(
 
     events.append(safe_info_event("DGN-BOOT", "Diagnostic mode started."))
     if not redaction_self_test():
+        # 마스킹 자체가 실패하면 안전 리포트를 만들 수 없으므로 즉시 중단합니다.
         events.append(event_from_code("WLC-SEC-001"))
         return finish("WLC-SEC-001")
 
@@ -68,6 +69,8 @@ def run_diagnostic(
     events.append(safe_info_event("DGN-INPUT", "Diagnostic inputs validated."))
 
     def progress(event: str, payload: dict[str, object]) -> None:
+        # 일반 수집의 상세 로그를 외부 공유 가능한 단계/오류 코드 이벤트로 축약합니다.
+        # payload에 실제 장비 응답이 들어와도 DiagnosticEvent 생성 단계에서 마스킹됩니다.
         command_id = str(payload.get("command_id", ""))
         if event == "connect":
             events.append(safe_info_event("DGN-NET", "Connection attempt started."))
@@ -84,6 +87,7 @@ def run_diagnostic(
             events.append(safe_info_event("DGN-PARSE", f"{event.replace('_', ' ').title()}."))
 
     if offline_raw_dir:
+        # 개발 PC에서는 실제 장비 대신 fixture 파일로 진단 리포트 흐름을 검증할 수 있습니다.
         events.append(safe_info_event("DGN-MOCK", "Offline raw diagnostic input selected."))
         result = collect_from_offline_raw(target.controller, offline_raw_dir)
     else:

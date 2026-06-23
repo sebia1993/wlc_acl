@@ -35,6 +35,8 @@ class MockWlcServer:
         return cls(protocol, load_mock_scenario(scenario_path), host=host, port=port)
 
     def start(self) -> MockServerEndpoint:
+        # 같은 scenario JSON을 Telnet/SSH 양쪽 프로토콜에서 재사용합니다.
+        # 그래서 파서와 진단 로직은 실제 장비 없이도 동일한 명령 응답 흐름을 테스트할 수 있습니다.
         if self.protocol == "telnet":
             self._start_telnet()
         elif self.protocol == "ssh":
@@ -67,6 +69,7 @@ class MockWlcServer:
 
         class Handler(socketserver.BaseRequestHandler):
             def handle(handler_self) -> None:
+                # 실제 인증 검증이 목적이 아니라 collector가 기대하는 로그인 프롬프트 흐름을 흉내 냅니다.
                 _send(handler_self.request, scenario.username_prompt)
                 _read_line(handler_self.request)
                 _send(handler_self.request, scenario.password_prompt)
@@ -98,6 +101,7 @@ class MockWlcServer:
             raise RuntimeError("paramiko is required for mock SSH server") from exc
 
         scenario = self.scenario
+        # 테스트 서버용 임시 host key입니다. 배포되는 비밀키가 아니며 실행 때마다 새로 만듭니다.
         host_key = paramiko.RSAKey.generate(2048)
         listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

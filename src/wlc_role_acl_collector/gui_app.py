@@ -149,6 +149,8 @@ class WlcRoleAclCollectorGui(tk.Tk):
         self.configure(bg=APP_BG)
         self.minsize(*MIN_WINDOW_SIZE)
 
+        # Tkinter 화면은 메인 스레드에서만 안전하게 수정해야 합니다.
+        # 백그라운드 수집 스레드는 event_queue에 메시지만 넣고, _drain_events가 화면을 갱신합니다.
         self.event_queue: "queue.Queue[tuple[str, object]]" = queue.Queue()
         self.worker: threading.Thread | None = None
         self.is_running = False
@@ -662,6 +664,8 @@ class WlcRoleAclCollectorGui(tk.Tk):
             raise ValueError("Timeout seconds must be a number.") from exc
 
     def _run_collection_worker(self, target, output_dir: Path, timeout: int, role_networks) -> None:
+        # 일반 수집 모드는 문제 분석을 위해 raw 명령 결과를 로컬 run_dir 아래에 저장합니다.
+        # 단, user-table처럼 민감정보가 많은 출력은 report.py에서 원문 저장을 막습니다.
         run_dir = output_dir / timestamp_slug()
         log_lines = [
             "WLC Role ACL Collector run log",
@@ -675,6 +679,8 @@ class WlcRoleAclCollectorGui(tk.Tk):
             log_lines.append(f"Role network Excel rows loaded for session only: {len(role_networks)}")
 
         def progress(event: str, payload: dict[str, object]) -> None:
+            # collector.py의 진행 이벤트를 GUI 상태/로그 문구로 바꾸는 어댑터입니다.
+            # 이 함수 안에서도 직접 위젯을 만지지 않고 queue에만 넣습니다.
             if event == "connect":
                 self.event_queue.put(("stage", "connecting"))
             elif event in {"connect_done", "roles_discovered", "aliases_discovered", "command_start", "command_done"}:
@@ -749,6 +755,8 @@ class WlcRoleAclCollectorGui(tk.Tk):
 
     def _run_diagnostic_worker(self, target, output_dir: Path, timeout: int) -> None:
         try:
+            # Safe Diagnostic은 원본 장비 출력을 저장하지 않고 오류 코드와 단계만 남깁니다.
+            # 회사 밖으로 공유해야 하는 상황에서는 이 결과만 전달하는 흐름을 의도합니다.
             self.event_queue.put(("stage", "connecting"))
             self.event_queue.put(("status", "Running safe diagnostic"))
             self.event_queue.put(("log", "Safe diagnostic mode does not save raw device output."))

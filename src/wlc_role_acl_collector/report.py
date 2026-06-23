@@ -52,6 +52,8 @@ def write_raw_result(result: CollectionResult, raw_dir: Path) -> Path:
 
 def _raw_output_for_storage(command) -> str:
     if command.command_id == "user_table":
+        # user-table에는 사용자 IP/MAC 같은 민감정보가 섞일 수 있습니다.
+        # 보고서에 필요한 건 사용자 수/대역 추정뿐이라 원문은 저장하지 않습니다.
         line_count = len([line for line in command.output.splitlines() if line.strip()])
         return "\n".join(
             [
@@ -66,6 +68,8 @@ def _raw_output_for_storage(command) -> str:
 def build_parsed_controllers(results: list[CollectionResult]) -> list[ParsedController]:
     parsed_items: list[ParsedController] = []
     for result in results:
+        # collector.py는 명령 결과를 평평한 리스트로 모읍니다.
+        # parser.py가 쓰기 쉽도록 Role별 rights 출력과 Alias별 netdestination 출력을 다시 묶습니다.
         rights_outputs = {}
         netdestination_outputs = {}
         for command in result.commands:
@@ -95,11 +99,15 @@ def write_reports(
     export_local_role_networks: bool = False,
     access_history_enabled: bool = False,
 ) -> dict[str, Path]:
+    # 외부로 전달되는 최종 산출물은 여기서 만들어집니다.
+    # local Role network는 사용자가 명시적으로 export를 켠 경우에만 보고서에 포함됩니다.
     output_dir.mkdir(parents=True, exist_ok=True)
     workbook_path = output_dir / "ssid_role_acl_report.xlsx"
     html_path = output_dir / "ssid_role_acl_report.html"
 
     local_role_networks = local_role_networks or []
+    # pandas DataFrame은 Excel과 HTML 양쪽에서 재사용하는 중간 표 형식입니다.
+    # 새 컬럼을 추가할 때는 이 frames 구조와 HTML/Excel 출력을 함께 확인해야 합니다.
     frames = _build_frames(
         parsed_controllers,
         collection_results,
@@ -530,6 +538,8 @@ def _write_html(
     for row in acl_rows:
         acl_by_role.setdefault(str(row.get("role", "")), []).append(row)
 
+    # HTML에서는 Role을 표 행으로 길게 나열하지 않고 탭 버튼으로 보여줍니다.
+    # 운영자가 자주 볼 가능성이 높은 "관측 사용자 수가 많은 Role"을 앞에 배치합니다.
     role_items = [
         {
             "role": role,
@@ -551,6 +561,8 @@ def _write_html(
         and any(_int_value(item["user_count"]) > 0 for item in role_items)
         and any(_int_value(item["user_count"]) == 0 for item in role_items)
     )
+    # user-table이 신뢰 가능할 때만 사용자 0명 Role을 기본 숨김 처리합니다.
+    # 데이터가 없을 때 전부 숨겨져 빈 보고서가 되는 상황을 피하기 위한 조건입니다.
     for item in role_items:
         item["zero_user_hidden"] = zero_user_hiding_enabled and _int_value(item["user_count"]) == 0
     zero_user_hidden_count = sum(1 for item in role_items if item["zero_user_hidden"])
@@ -570,6 +582,8 @@ def _write_html(
         local_network_rows,
         include_local_networks=local_role_networks_enabled,
     )
+    # Access Check는 브라우저 안에서 동작하므로 필요한 ACL/Alias 데이터를 JSON으로 HTML에 심습니다.
+    # local Role network는 보안 정책상 export 옵션이 켜진 경우에만 포함됩니다.
     access_check_json = _json_for_html(access_check_data)
     access_check_controls = _access_check_controls_html(
         access_check_data,

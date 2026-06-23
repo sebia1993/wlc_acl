@@ -49,6 +49,8 @@ _HOSTNAME_PATTERN = re.compile(
 
 class Redactor:
     def __init__(self) -> None:
+        # 같은 값은 같은 라벨로 치환해 리포트 안에서 흐름은 따라갈 수 있게 합니다.
+        # 예: 같은 IP는 항상 <IP:1>로 보이지만 실제 값은 노출하지 않습니다.
         self._ip_labels: dict[str, str] = {}
         self._mac_labels: dict[str, str] = {}
         self._host_labels: dict[str, str] = {}
@@ -83,6 +85,8 @@ def redact_sensitive_text(value: str) -> str:
 
 
 def redact_payload(value: Any) -> Any:
+    # 진단 리포트는 문자열뿐 아니라 dict/list 형태의 metadata도 저장합니다.
+    # 구조는 유지하되 민감한 key나 값만 재귀적으로 마스킹합니다.
     if isinstance(value, str):
         return redact_sensitive_text(value)
     if isinstance(value, list):

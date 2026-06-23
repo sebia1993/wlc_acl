@@ -41,6 +41,8 @@ def collect_from_controller(
     except ImportError as exc:  # pragma: no cover
         raise RuntimeError("netmiko is required for live WLC collection") from exc
 
+    # 여기서부터가 실제 장비와 통신하는 유일한 구간입니다.
+    # 이후 단계는 CollectionResult에 담긴 텍스트만 보고 동작하게 분리해 둡니다.
     params = _build_connect_params(controller=controller, credentials=credentials, timeout=timeout)
 
     connection = None
@@ -54,6 +56,8 @@ def collect_from_controller(
             except Exception:
                 pass
 
+        # 기본 명령은 보고서 생성에 필요한 최소 입력값입니다.
+        # 특히 configuration_effective가 없으면 Role/ACL/Alias 탐색을 계속할 수 없습니다.
         for command_id, command in BASE_COMMANDS:
             _emit(progress_callback, "command_start", command_id=command_id, command=command, timeout=timeout)
             try:
@@ -93,6 +97,7 @@ def collect_from_controller(
             )
             return result
 
+        # 설정 안에서 alias 이름만 먼저 찾고, 각 alias의 실제 host/network/range는 추가 명령으로 보강합니다.
         aliases = discover_aliases_from_config(config_output)
         _emit(progress_callback, "aliases_discovered", total=len(aliases))
         for index, alias in enumerate(aliases, start=1):
@@ -142,6 +147,7 @@ def collect_from_controller(
                     error=str(exc),
                 )
 
+        # Role 이름도 설정에서 먼저 찾은 뒤 show rights로 실제 적용 ACL을 보강합니다.
         roles = discover_roles_from_config(config_output)
         _emit(progress_callback, "roles_discovered", total=len(roles))
         for index, role in enumerate(roles, start=1):
@@ -211,6 +217,8 @@ def collect_from_controller(
 
 
 def collect_from_offline_raw(controller: Controller, raw_root: Path) -> CollectionResult:
+    # 실제 장비 없이 테스트할 때 쓰는 경로입니다.
+    # tests/fixtures처럼 저장된 명령 결과 파일을 CollectionResult로 바꿔 파서/리포트를 검증합니다.
     controller_dir = raw_root / controller.name
     result = CollectionResult(controller=controller)
 

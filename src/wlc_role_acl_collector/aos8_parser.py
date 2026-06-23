@@ -109,6 +109,9 @@ def parse_controller_config(
 ) -> ParsedController:
     rights_outputs = rights_outputs or {}
     netdestination_outputs = netdestination_outputs or {}
+
+    # AOS8 설정은 "wlan ...", "user-role ..." 같은 블록 단위로 의미가 나뉩니다.
+    # 먼저 블록을 전부 분리한 뒤, 필요한 관계를 뒤에서 다시 연결합니다.
     blocks = list(_iter_blocks(config_text))
 
     ap_groups: dict[str, list[str]] = defaultdict(list)
@@ -141,12 +144,16 @@ def parse_controller_config(
                 config_vlan_networks[network.vlan] = network
 
     parsed = ParsedController(controller=controller)
+
+    # show netdestination 결과가 있으면 설정 파일의 alias 정의보다 우선 사용합니다.
+    # 운영 장비에서는 show 명령 결과가 host/network/range를 더 명확히 보여주는 경우가 많습니다.
     for alias, output in netdestination_outputs.items():
         entries = _parse_show_netdestination(controller.name, alias, output)
         if entries:
             netdestination_aliases[alias] = entries
     parsed.netdestination_aliases = netdestination_aliases
     _expand_acl_alias_references(acl_rules, netdestination_aliases)
+    # Role은 user-role 블록에 직접 정의될 수도 있고 AAA Profile의 기본 Role로만 등장할 수도 있습니다.
     role_names = set(role_defs)
     for aaa_profile in aaa_profiles.values():
         for _, field_name in ROLE_FIELDS:
@@ -184,6 +191,8 @@ def parse_controller_config(
         )
 
     _record_acl_unknowns(parsed, acl_rules, netdestination_aliases)
+
+    # SSID -> Virtual AP -> AAA Profile -> Role 순서로 따라가야 사용자가 어떤 Role을 받는지 알 수 있습니다.
     _build_ssid_role_mappings(
         parsed=parsed,
         ap_groups=ap_groups,
@@ -200,11 +209,15 @@ def parse_controller_config(
         user_table_output,
         role_names=set(parsed.role_policies),
     )
+    # VLAN/user-table 기반 네트워크 추정은 참고 정보입니다.
+    # 정확한 Role 대역은 별도 Role network Excel 기능으로 보강하도록 분리되어 있습니다.
     _apply_role_network_context(parsed)
     return parsed
 
 
 def discover_roles_from_config(config_text: str) -> list[str]:
+    # collector.py에서 show rights 대상 Role을 정하기 위한 가벼운 탐색 함수입니다.
+    # 전체 파싱보다 빠르게 Role 이름만 뽑습니다.
     roles: set[str] = set()
     for block_type, name, lines in _iter_blocks(config_text):
         if block_type == "user_role":
@@ -219,6 +232,7 @@ def discover_roles_from_config(config_text: str) -> list[str]:
 
 
 def discover_aliases_from_config(config_text: str) -> list[str]:
+    # ACL 안의 alias 참조만 먼저 찾아야 collector.py가 show netdestination을 추가 실행할 수 있습니다.
     aliases: set[str] = set()
     for block_type, _name, lines in _iter_blocks(config_text):
         if block_type != "acl":

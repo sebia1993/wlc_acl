@@ -79,6 +79,7 @@ def test_write_excel_and_html_report(tmp_path):
     assert "<th>Effective VLAN</th>" not in html
     assert "Role User Network" not in html
     assert "Local Role Network" not in html
+    assert "내부망 전용 보고서" not in html
     assert "Configured Subnet" not in html
     assert "network-context" not in html
     assert "network-chip" not in html
@@ -126,6 +127,14 @@ def test_write_excel_and_html_report(tmp_path):
     assert "syncRawToggleButton" in html
     assert "report-header-inner" in html
     assert "report-summary-pill" in html
+    assert 'class="executive-summary"' in html
+    assert "결론 요약" in html
+    assert "확인 필요" in html
+    assert "사용자 많은 Role TOP 3" in html
+    assert "Access Check 판정 제한 있음" in html
+    assert html.index("결론 요약") < html.index('class="report-actions no-print"')
+    assert html.index("결론 요약") < html.index('class="access-check no-print"')
+    assert html.index("Role ACL Detail") < html.index('class="access-check no-print"')
     assert "rule-badge action-deny" in html
     assert "rule-badge action-special" in html
     assert "rule-badge service-badge" in html
@@ -133,10 +142,13 @@ def test_write_excel_and_html_report(tmp_path):
     assert 'id="access-check-data" type="application/json"' in html
     assert 'id="access-check-source"' in html
     assert 'id="access-check-destination"' in html
-    assert "Auto - match by source/destination" in html
-    assert "Service auto mode matched a rule limited to" in html
-    assert "No matching Role ACL" in html
-    assert "Access Check only evaluates ACLs whose ACL name exactly matches the selected Role." in html
+    assert "자동 - Source/Destination 기준" in html
+    assert "Service 자동 모드가" in html
+    assert "일치하는 Role ACL 없음" in html
+    assert "Access Check는 선택한 Role 이름과 정확히 같은 ACL만 판정합니다." in html
+    assert ">검사</button>" in html
+    assert "검사 결과 없음." in html
+    assert "보고서에 포함된 ACL/Alias 데이터만 사용하며" in html
     assert 'id="access-check-history-data"' not in html
     assert 'id="access-check-history"' not in html
     assert 'id="clear-access-history"' not in html
@@ -256,6 +268,9 @@ def test_write_report_exports_local_role_network_mapping_when_enabled(tmp_path):
     assert any(row["role"] == "corp-employee" and row["status"] == "Local mapping missing" for row in local_rows)
 
     html = files["html"].read_text(encoding="utf-8")
+    assert "내부망 전용 보고서" in html
+    assert "사내 Role 대역표가 포함되어" in html
+    assert "Source IP가 해당 Role 대역 밖이면 경고" in html
     assert "Local Role Network" in html
     assert "10.30.0.0/24" in html
     assert "10.31.0.0/24" in html

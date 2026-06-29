@@ -33,6 +33,7 @@ def test_release_zip_includes_guides():
     assert "docs\\DIAGNOSTIC_MODE_KO.html" in text
     assert "docs\\SECURITY_MODEL_KO.md" in text
     assert "docs\\SECURITY_MODEL_KO.html" in text
+    assert "config\\role_networks.example.xlsx" in text
     assert "config\\mock_scenarios" in text
     assert "USER_GUIDE_KO.md" in text
     assert "USER_GUIDE_KO.html" in text
@@ -72,3 +73,36 @@ def test_generate_doc_html_outputs_browser_files(tmp_path):
     assert "WLC Role ACL Collector 진단 모드" in diagnostic_html
     assert "WLC Role ACL Collector 보안 모델" in security_html
     assert "Generated from Markdown for browser viewing." in developer_html
+
+
+def test_github_actions_split_pr_validation_and_release():
+    repo_root = Path(__file__).parents[1]
+    pr_workflow = (repo_root / ".github" / "workflows" / "pr-validation.yml").read_text(encoding="utf-8")
+    release_workflow = (repo_root / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+
+    validation_command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\\tools\\validate.ps1"
+    build_command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\\build_windows_gui_exe.ps1"
+
+    assert "pull_request:" in pr_workflow
+    assert "branches: [main]" in pr_workflow
+    assert validation_command in pr_workflow
+    assert build_command in pr_workflow
+    assert "gh release" not in pr_workflow
+
+    assert "push:" in release_workflow
+    assert "pull_request:" not in release_workflow
+    assert "contents: write" in release_workflow
+    assert "Korea Standard Time" in release_workflow
+    assert "yyyy.MM.dd-HHmmss" in release_workflow
+    assert validation_command in release_workflow
+    assert build_command in release_workflow
+    assert "Get-FileHash -Algorithm SHA256" in release_workflow
+    assert "git tag" in release_workflow
+    assert 'git push origin "refs/tags/' in release_workflow
+    assert "gh release create" in release_workflow
+    assert "--verify-tag" in release_workflow
+    assert "--draft" in release_workflow
+    assert "gh release edit" in release_workflow
+    assert "--draft=false" in release_workflow
+    assert "--cleanup-tag" in release_workflow
+    assert 'git push origin ":refs/tags/$tag"' in release_workflow

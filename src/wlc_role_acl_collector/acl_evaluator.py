@@ -12,9 +12,9 @@ from typing import Any
 
 
 SPECIAL_ALLOW_ACTIONS = {"src-nat", "dst-nat", "redirect", "route", "tunnel", "forward"}
-NO_MATCHING_ROLE_ACL_VERDICT = "No matching Role ACL"
+NO_MATCHING_ROLE_ACL_VERDICT = "일치하는 Role ACL 없음"
 EXACT_ROLE_ACL_WARNING = (
-    "Access Check only evaluates ACLs whose ACL name exactly matches the selected Role."
+    "Access Check는 선택한 Role 이름과 정확히 같은 ACL만 판정합니다."
 )
 
 
@@ -139,8 +139,8 @@ def evaluate_access(
     if role_data is None:
         return {
             "status": "error",
-            "verdict": "Role not found",
-            "warnings": [f"Role was not found in the report data: {role}"],
+            "verdict": "Role을 찾을 수 없음",
+            "warnings": [f"보고서 데이터에서 Role을 찾을 수 없습니다: {role}"],
         }
     if not role_data.get("rules", []):
         return {
@@ -199,11 +199,11 @@ def evaluate_access(
     warnings = list(local_warnings)
     if uncertain_rules:
         warnings.append(
-            f"{len(uncertain_rules)} rule(s) could not be fully evaluated because alias/name data is incomplete."
+            f"{len(uncertain_rules)}개 rule은 alias/name 데이터가 불완전해 완전 판정하지 못했습니다."
         )
     return {
         "status": "blocked",
-        "verdict": "Implicit deny",
+        "verdict": "기본 차단(Implicit deny)",
         "conditional": False,
         "matchedRule": None,
         "warnings": _unique(warnings),
@@ -363,7 +363,7 @@ def _service_matches(rule_service: str, selected_service: str) -> dict[str, Any]
             "matched": True,
             "conditional": True,
             "warnings": [
-                f"Service auto mode matched a rule limited to {rule_service}; select the exact service to confirm."
+                f"Service 자동 모드가 {rule_service} 전용 rule에 매칭되었습니다. 정확한 Service를 선택해 재확인하세요."
             ],
         }
     return {
@@ -376,12 +376,12 @@ def _service_matches(rule_service: str, selected_service: str) -> dict[str, Any]
 def _action_verdict(action: str) -> dict[str, str]:
     normalized = action.strip().casefold()
     if normalized == "deny":
-        return {"status": "blocked", "label": "Blocked"}
+        return {"status": "blocked", "label": "차단(Blocked)"}
     if normalized == "permit":
-        return {"status": "allowed", "label": "Allowed"}
+        return {"status": "allowed", "label": "허용(Allowed)"}
     if normalized in SPECIAL_ALLOW_ACTIONS:
-        return {"status": "special", "label": "Allowed with NAT/Special Action"}
-    return {"status": "unknown", "label": f"Unknown action: {action or 'not parsed'}"}
+        return {"status": "special", "label": "NAT/특수 Action 허용"}
+    return {"status": "unknown", "label": f"알 수 없는 action: {action or 'not parsed'}"}
 
 
 def _local_source_warnings(role_data: dict[str, Any], source_number: int, source_ip: str) -> list[str]:
@@ -391,7 +391,7 @@ def _local_source_warnings(role_data: dict[str, Any], source_number: int, source
     if any(_int_value(network.get("start")) <= source_number <= _int_value(network.get("end")) for network in networks):
         return []
     labels = ", ".join(_clean(network.get("network") or network.get("label")) for network in networks)
-    return [f"Source IP {source_ip} is outside the local Role Network mapping: {labels}"]
+    return [f"Source IP {source_ip}가 사내 Role 대역표 범위 밖입니다: {labels}"]
 
 
 def _group_alias_rows(rows: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:

@@ -35,14 +35,14 @@ GUI 입력 항목:
 - Username
 - Password, Enable password
 - Output 폴더
-- Role network Excel: 선택 사항입니다. `Role 이름`, `네트워크 대역`, `서브넷마스크` 컬럼을 가진 Excel 파일을 넣으면 HTML/Excel 보고서에 로컬 기준 Role 대역과 WLC 추정값 비교 결과가 표시됩니다.
-- Timeout seconds
+- 고급 옵션의 사내 Role 대역표: 선택 사항입니다. `Role 이름`, `네트워크 대역` 컬럼을 가진 Excel 파일을 넣으면 내부용 HTML/Excel 보고서에 로컬 기준 Role 대역과 WLC 추정값 비교 결과가 표시됩니다. CIDR(`10.40.1.0/24`) 입력을 권장하며, CIDR을 쓰지 않을 때만 `서브넷마스크` 컬럼이 필요합니다.
+- 고급 옵션의 Timeout seconds
 
-Role network Excel은 실제 Excel 통합 문서 형식(`.xlsx` 또는 `.xlsm`)이어야 합니다. CSV, HTML, 구형 `.xls` 파일의 확장자만 `.xlsx`로 바꾸면 열 수 없습니다. 제공된 `config\role_networks.example.xlsx`를 열어 값만 수정한 뒤 `다른 이름으로 저장 > Excel 통합 문서 (*.xlsx)`로 저장해서 사용하세요.
+사내 Role 대역표는 실제 Excel 통합 문서 형식(`.xlsx` 또는 `.xlsm`)이어야 합니다. CSV, HTML, 구형 `.xls` 파일의 확장자만 `.xlsx`로 바꾸면 열 수 없습니다. GUI의 `작성법` 버튼에서 앱 내부 작성 가이드를 볼 수 있고, `샘플 열기` 버튼으로 제공된 `config\role_networks.example.xlsx`를 열 수 있습니다. 샘플 파일의 `Role_Networks` 시트를 복사/수정해서 사용하고, `작성가이드` 시트에서 예시와 주의사항을 확인하세요.
 
-`수집 시작`을 누르면 WLC 접속부터 명령 수집, 보고서 생성까지 순서대로 진행합니다. 접속에 실패하면 Run Log와 오류창에 원인이 표시됩니다.
+기본 화면은 `접속 정보 입력 → 수집 시작 → 결과 확인` 순서입니다. 사내 Role 대역표, Timeout seconds, 안전 진단은 `고급 옵션 표시`를 눌렀을 때 나타납니다.
 
-수집 중에는 Run Log에 현재 실행 중인 명령, Role 진행 번호, 실패 명령이 표시됩니다. 창을 줄여도 입력 영역은 스크롤되고 하단 실행/결과 버튼은 계속 보입니다.
+`수집 시작`을 누르면 WLC 접속부터 명령 수집, 보고서 생성까지 순서대로 진행합니다. 완료 후에는 `HTML 보고서 열기`를 먼저 확인하고, 필요할 때 `Excel 열기` 또는 `결과 폴더 열기`를 사용합니다. 접속에 실패하면 오류창에 원인이 표시되며, `수집 로그 표시`를 눌러 현재 실행 중인 명령, Role 진행 번호, 실패 명령을 확인할 수 있습니다.
 
 ACL에 `alias <이름>`이 있으면 자동으로 `show netdestination <이름>`을 실행합니다. 보고서의 `Role_ACL_Detail`에는 source/destination 상세가 붙고, `Alias_Detail` 시트에는 alias 내부 host/network/range/name 목록이 정리됩니다.
 
@@ -145,17 +145,17 @@ HTML 보고서의 ACL 주석은 입력 즉시 브라우저 `localStorage`에 임
 
 ## HTML Access Check
 
-생성된 HTML 보고서의 `Access Check` 영역에서 Role, Source IP, Destination IP, Service를 입력하면 해당 Role에 연결된 ACL을 위에서부터 검사해 첫 번째 매칭 룰 기준으로 결과를 표시합니다. 장비에 다시 접속하지 않고 보고서 안에 포함된 ACL/Alias 데이터를 사용합니다.
+생성된 HTML 보고서 하단의 `Access Check` 영역에서 Role, Source IP, Destination IP, Service를 입력하면 해당 Role에 연결된 ACL을 위에서부터 검사해 첫 번째 매칭 룰 기준으로 결과를 표시합니다. 장비에 다시 접속하지 않고 보고서 안에 포함된 ACL/Alias 데이터를 사용합니다.
 
-- `Allowed`: `permit` 룰에 매칭된 경우입니다.
-- `Blocked`: `deny` 룰에 매칭된 경우입니다.
-- `Allowed with NAT/Special Action`: `src-nat`, `dst-nat`, `redirect`, `route`, `tunnel`, `forward` 같은 액션에 매칭된 경우입니다.
-- `Implicit deny`: Source/Destination/Service 기준으로 매칭되는 룰이 없는 경우입니다.
-- `Conditional`: Service를 선택하지 않았고, 매칭된 ACL 룰이 `any`가 아닌 특정 service에 제한된 경우입니다. 정확한 판정에는 Service 선택이 필요합니다.
+- `허용(Allowed)`: `permit` 룰에 매칭된 경우입니다.
+- `차단(Blocked)`: `deny` 룰에 매칭된 경우입니다.
+- `NAT/특수 Action 허용`: `src-nat`, `dst-nat`, `redirect`, `route`, `tunnel`, `forward` 같은 액션에 매칭된 경우입니다.
+- `기본 차단(Implicit deny)`: Source/Destination/Service 기준으로 매칭되는 룰이 없는 경우입니다.
+- `조건부`: Service를 선택하지 않았고, 매칭된 ACL 룰이 `any`가 아닌 특정 service에 제한된 경우입니다. 정확한 판정에는 Service 선택이 필요합니다.
 
 Service 판정은 현재 ACL에 수집된 service token 기준입니다. 예를 들어 `svc-dns`, `svc-http`, `svc-https`, `any` 같은 값을 비교합니다. TCP/UDP 포트 번호를 직접 입력해 service object까지 정밀 해석하는 기능은 아직 포함하지 않습니다.
 
-Access Check 조회 이력은 브라우저 `localStorage`에 저장되며, `주석 포함 HTML 저장`을 누르면 저장된 HTML 안에도 함께 포함됩니다. 이력에는 Role, Source IP, Destination IP, Service, 판정 결과, 매칭 ACL 룰이 남습니다. 실제 IP가 포함될 수 있으므로 외부 공유 전에는 `Clear history`로 이력을 삭제하거나 저장 HTML 내용을 확인하십시오.
+보안모드에서는 Access Check 조회 이력을 기본 저장하지 않습니다. 내부 보관용으로 이력 저장을 별도 활성화한 HTML은 Role, Source IP, Destination IP, Service, 판정 결과, 매칭 ACL 룰이 남을 수 있으므로 외부 공유 전 내용을 확인해야 합니다.
 
 ## 로컬 검증과 Git 기록
 
@@ -174,15 +174,15 @@ git log --oneline -n 5
 
 ## Secure Role Network Handling
 
-Role network Excel files are treated as internal-only data. The default GUI and CLI behavior is secure mode:
+Role network Excel files are treated as internal-only data. GUI and CLI behavior differ intentionally:
 
-- The Excel file can be selected inside the company network for the current run.
-- Local Role network values are not exported to the generated HTML or Excel reports by default.
+- In the GUI, selecting the internal Role network workbook creates an internal-only HTML/Excel report that includes local Role networks and WLC comparison status.
+- In the CLI, local Role network values are not exported unless `--export-local-role-networks` is explicitly enabled.
 - The generated HTML Access Check does not persist lookup history by default.
 - Run logs record only the number of loaded Role network rows, not the Excel file path or subnet values.
 - `outputs/`, `config/private/`, and local sensitive workbook/report name patterns are ignored by local git.
 
-If an internal-only report must include local Role network mappings, the CLI supports an explicit opt-in:
+For CLI-created internal-only reports, use the explicit opt-in:
 
 ```powershell
 python -m wlc_role_acl_collector collect --role-networks config\role_networks.example.xlsx --export-local-role-networks

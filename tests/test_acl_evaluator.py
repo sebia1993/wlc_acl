@@ -49,7 +49,7 @@ def test_evaluate_access_blocks_first_matching_deny_rule():
     )
 
     assert result["status"] == "blocked"
-    assert result["verdict"] == "Blocked"
+    assert result["verdict"] == "차단(Blocked)"
     assert result["matchedRule"]["sequence"] == "1"
 
 
@@ -96,7 +96,7 @@ def test_evaluate_access_treats_nat_actions_as_special_allow():
     )
 
     assert result["status"] == "special"
-    assert result["verdict"] == "Allowed with NAT/Special Action"
+    assert result["verdict"] == "NAT/특수 Action 허용"
     assert result["matchedRule"]["sequence"] == "2"
 
 
@@ -146,7 +146,7 @@ def test_evaluate_access_auto_service_matches_alias_and_marks_specific_service_c
     assert exact_result["conditional"] is False
     assert conditional_result["status"] == "special"
     assert conditional_result["conditional"] is True
-    assert "Service auto mode matched a rule limited to svc-https" in conditional_result["warnings"][0]
+    assert "Service 자동 모드가 svc-https 전용 rule에 매칭되었습니다" in conditional_result["warnings"][0]
 
 
 def test_evaluate_access_auto_service_uses_first_source_destination_match_in_order():
@@ -310,5 +310,5 @@ def test_evaluate_access_warns_when_source_is_outside_local_role_network():
 
     assert result["status"] == "allowed"
     assert result["warnings"] == [
-        "Source IP 10.50.1.10 is outside the local Role Network mapping: 10.40.1.0/24"
+        "Source IP 10.50.1.10가 사내 Role 대역표 범위 밖입니다: 10.40.1.0/24"
     ]

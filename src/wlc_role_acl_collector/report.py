@@ -428,7 +428,7 @@ def _local_network_rows(
                     "role": role,
                     "local_role_network": definition.network,
                     "subnet_mask": definition.subnet_mask,
-                    "source_file": definition.source_file,
+                    "source_file": Path(definition.source_file).name,
                     "source_row": definition.source_row,
                     "status": status["status"],
                     "notes": status["notes"],
@@ -522,6 +522,10 @@ def _write_html(
     raw_command_rows = frames["Raw_Commands"].to_dict(orient="records")
     user_table_counts_reliable = _user_table_counts_reliable(raw_command_rows)
     unresolved_count = len(frames["Unresolved"])
+    internal_role_network_banner = _internal_role_network_banner_html(
+        local_network_rows,
+        enabled=local_role_networks_enabled,
+    )
 
     cards = "\n".join(
         f"""
@@ -556,6 +560,12 @@ def _write_html(
             start=1,
         )
     ]
+    executive_summary = _executive_summary_html(
+        frames,
+        role_items,
+        local_network_rows,
+        unresolved_count=unresolved_count,
+    )
     zero_user_hiding_enabled = (
         user_table_counts_reliable
         and any(_int_value(item["user_count"]) > 0 for item in role_items)
@@ -588,6 +598,7 @@ def _write_html(
     access_check_controls = _access_check_controls_html(
         access_check_data,
         history_enabled=access_history_enabled,
+        local_role_networks_enabled=local_role_networks_enabled,
     )
     access_check_css = _access_check_css()
     access_check_script = _access_check_script(history_enabled=access_history_enabled)
@@ -722,6 +733,97 @@ def _write_html(
     .metric-label {{ font-size: 12px; font-weight: 700; }}
     .metric-value {{ font-size: 30px; display: block; margin: 4px 0; }}
     .metric-detail {{ font-size: 12px; }}
+    .executive-summary {{
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      margin: 0 0 16px;
+      padding: 16px;
+    }}
+    .executive-summary-header {{
+      align-items: flex-start;
+      display: flex;
+      gap: 12px;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }}
+    .executive-summary h2 {{
+      font-size: 18px;
+      margin: 0;
+    }}
+    .executive-summary p {{
+      color: var(--muted);
+      margin: 4px 0 0;
+    }}
+    .attention-badge {{
+      background: var(--warning-soft);
+      border: 1px solid #fedf89;
+      border-radius: 999px;
+      color: var(--warning);
+      flex: 0 0 auto;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 6px 10px;
+    }}
+    .summary-grid {{
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    }}
+    .summary-item {{
+      background: var(--panel-subtle);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+    }}
+    .summary-item strong {{
+      display: block;
+      font-size: 14px;
+      margin-bottom: 5px;
+    }}
+    .summary-item span,
+    .summary-item li {{
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }}
+    .summary-item ul {{
+      margin: 0;
+      padding-left: 18px;
+    }}
+    .internal-network-banner {{
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-radius: 8px;
+      color: #7c2d12;
+      margin: 0 0 16px;
+      padding: 13px 15px;
+    }}
+    .internal-network-banner strong {{
+      display: block;
+      font-size: 14px;
+      margin-bottom: 5px;
+    }}
+    .internal-network-banner p {{
+      margin: 0 0 8px;
+    }}
+    .internal-network-banner ul {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }}
+    .internal-network-banner li {{
+      background: #ffffff;
+      border: 1px solid #fed7aa;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 8px;
+    }}
     .report-actions {{
       display: flex;
       gap: 8px;
@@ -1026,6 +1128,7 @@ def _write_html(
       header, main {{ padding: 14px 18px; }}
       .no-print {{ display: none !important; }}
       .metric,
+      .executive-summary,
       .acl-section,
       .access-check {{
         box-shadow: none;
@@ -1064,18 +1167,20 @@ def _write_html(
   </header>
   <main>
     <div class="metrics">{cards}</div>
+    {executive_summary}
+    {internal_role_network_banner}
+    <h2>Role ACL Detail</h2>
     <div class="report-actions no-print">
       <button id="save-commented-html" class="report-action" type="button">주석 포함 HTML 저장</button>
       <button id="print-pdf" class="report-action secondary" type="button">PDF 저장/인쇄</button>
       <button id="toggle-raw" class="report-action secondary" type="button" aria-pressed="false">Raw 보기</button>
     </div>
-    {access_check_controls}
-    <h2>Role ACL Detail</h2>
     {zero_user_role_controls}
     <div class="role-tabs no-print" role="tablist" aria-label="Role ACL list">
       {role_buttons}
     </div>
     {acl_sections}
+    {access_check_controls}
   </main>
   <script id="access-check-data" type="application/json">{access_check_json}</script>
   {_access_check_history_data_html(access_history_enabled)}
@@ -1393,7 +1498,145 @@ def _access_check_history_data_html(enabled: bool) -> str:
     return '<textarea id="access-check-history-data" hidden>[]</textarea>'
 
 
-def _access_check_controls_html(access_check_data: dict[str, Any], *, history_enabled: bool = False) -> str:
+def _internal_role_network_banner_html(rows: list[dict[str, Any]], *, enabled: bool) -> str:
+    if not enabled:
+        return ""
+    role_names = {
+        str(row.get("role", "")).strip().casefold()
+        for row in rows
+        if str(row.get("role", "")).strip()
+    }
+    network_count = len(
+        [
+            row
+            for row in rows
+            if str(row.get("local_role_network", "")).strip()
+        ]
+    )
+    status_counts: dict[str, int] = {}
+    counted_status_roles: set[tuple[str, str]] = set()
+    for row in rows:
+        role = str(row.get("role", "")).strip().casefold()
+        status = str(row.get("status", "")).strip() or "Unknown"
+        key = (role, status)
+        if key in counted_status_roles:
+            continue
+        counted_status_roles.add(key)
+        status_counts[status] = status_counts.get(status, 0) + 1
+    status_items = "".join(
+        f"<li>{escape(status)} {count}</li>"
+        for status, count in sorted(status_counts.items(), key=lambda item: item[0].casefold())
+    )
+    return f"""
+    <section class="internal-network-banner" aria-label="Internal Role network notice">
+      <strong>내부망 전용 보고서</strong>
+      <p>사내 Role 대역표가 포함되어 실제 네트워크 대역과 WLC 수집값 비교 상태를 표시합니다. 회사 외부 공유 전 반드시 내용을 확인하세요.</p>
+      <ul>
+        <li>Role {len(role_names)}개</li>
+        <li>대역 {network_count}개</li>
+        {status_items}
+      </ul>
+    </section>
+    """
+
+
+def _executive_summary_html(
+    frames: dict[str, pd.DataFrame],
+    role_items: list[dict[str, Any]],
+    local_network_rows: list[dict[str, Any]],
+    *,
+    unresolved_count: int,
+) -> str:
+    ssid_rows = frames.get("SSID_Role_Map", pd.DataFrame()).to_dict(orient="records")
+    dynamic_roles = {
+        str(row.get("role", "")).strip()
+        for row in ssid_rows
+        if str(row.get("role", "")).strip() and _bool_value(row.get("dynamic_role_possible"))
+    }
+    local_attention_statuses = {"Mismatch", "Local mapping missing", "Role not collected"}
+    local_attention_roles = {
+        (
+            str(row.get("role", "")).strip().casefold(),
+            str(row.get("status", "")).strip(),
+        )
+        for row in local_network_rows
+        if str(row.get("role", "")).strip()
+        and str(row.get("status", "")).strip() in local_attention_statuses
+    }
+    attention_count = unresolved_count + len(dynamic_roles) + len(local_attention_roles)
+    top_roles = [
+        item
+        for item in role_items[:3]
+        if str(item.get("role", "")).strip()
+    ]
+    if top_roles:
+        top_role_html = "".join(
+            "<li>"
+            f"{escape(str(item.get('role', '')))} "
+            f"<span>{_int_value(item.get('user_count'))} users</span>"
+            "</li>"
+            for item in top_roles
+        )
+    else:
+        top_role_html = "<li>확인 가능한 Role 없음</li>"
+
+    dynamic_text = (
+        f"{len(dynamic_roles)}개 Role에서 동적 Role 가능성이 표시되었습니다."
+        if dynamic_roles
+        else "현재 보고서 기준 동적 Role 가능성이 표시된 항목은 없습니다."
+    )
+    local_text = (
+        f"사내 Role 대역표 비교 확인 필요 {len(local_attention_roles)}건"
+        if local_network_rows
+        else "사내 Role 대역표를 선택하지 않아 내부 대역 비교는 생략되었습니다."
+    )
+    conclusion_text = (
+        "확인 필요 항목이 있습니다. 아래 Role ACL Detail을 먼저 확인하세요."
+        if attention_count
+        else "즉시 확인할 고위험 요약 항목은 없습니다. 세부 ACL은 아래 Role ACL Detail에서 확인하세요."
+    )
+
+    return f"""
+    <section class="executive-summary" aria-label="Report conclusion summary">
+      <div class="executive-summary-header">
+        <div>
+          <h2>결론 요약</h2>
+          <p>{escape(conclusion_text)}</p>
+        </div>
+        <span class="attention-badge">확인 필요 {attention_count}건</span>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-item">
+          <strong>Unresolved {unresolved_count}건</strong>
+          <span>Alias, ACL, Role 해석이 불완전한 항목입니다.</span>
+        </div>
+        <div class="summary-item">
+          <strong>사용자 많은 Role TOP 3</strong>
+          <ul>{top_role_html}</ul>
+        </div>
+        <div class="summary-item">
+          <strong>동적 Role 가능성</strong>
+          <span>{escape(dynamic_text)}</span>
+        </div>
+        <div class="summary-item">
+          <strong>사내 Role 대역 비교</strong>
+          <span>{escape(local_text)}</span>
+        </div>
+        <div class="summary-item">
+          <strong>Access Check 판정 제한 있음</strong>
+          <span>선택한 Role 이름과 정확히 같은 ACL만 보조 판정합니다. 실제 정책 검토는 Role ACL Detail을 기준으로 확인하세요.</span>
+        </div>
+      </div>
+    </section>
+    """
+
+
+def _access_check_controls_html(
+    access_check_data: dict[str, Any],
+    *,
+    history_enabled: bool = False,
+    local_role_networks_enabled: bool = False,
+) -> str:
     roles = access_check_data.get("roles", [])
     role_options = "".join(
         f"""
@@ -1414,10 +1657,10 @@ def _access_check_controls_html(access_check_data: dict[str, Any], *, history_en
       <div class="access-history">
         <div class="access-history-header">
           <h3>Access Check History</h3>
-          <button id="clear-access-history" class="report-action secondary" type="button"{disabled}>Clear history</button>
+          <button id="clear-access-history" class="report-action secondary" type="button"{disabled}>이력 지우기</button>
         </div>
         <div id="access-check-history" class="access-history-body">
-          <span class="notice">No access check history.</span>
+          <span class="notice">Access Check 이력이 없습니다.</span>
         </div>
       </div>
         """
@@ -1425,6 +1668,12 @@ def _access_check_controls_html(access_check_data: dict[str, Any], *, history_en
     <section class="access-check no-print" aria-label="Role access check">
       <div class="access-check-title">
         <h2>Access Check</h2>
+      </div>
+      <div class="access-check-limits">
+        <strong>검사 기준</strong>
+        <span>보고서에 포함된 ACL/Alias 데이터만 사용하며, 선택한 Role 이름과 정확히 같은 ACL만 판정합니다.</span>
+        <span>Service object의 실제 TCP/UDP 포트 내부까지는 해석하지 않습니다.</span>
+        {_access_check_local_network_note(local_role_networks_enabled)}
       </div>
       <div class="access-check-grid">
         <label class="access-field">
@@ -1442,18 +1691,24 @@ def _access_check_controls_html(access_check_data: dict[str, Any], *, history_en
         <label class="access-field">
           <span>Service</span>
           <select id="access-check-service"{disabled}>
-            <option value="">Auto - match by source/destination</option>
+            <option value="">자동 - Source/Destination 기준</option>
             {service_options}
           </select>
         </label>
-        <button id="run-access-check" class="report-action access-run" type="button"{disabled}>Check</button>
+        <button id="run-access-check" class="report-action access-run" type="button"{disabled}>검사</button>
       </div>
       <div id="access-check-result" class="access-check-result" data-status="empty" aria-live="polite">
-        <span>No access check result.</span>
+        <span>검사 결과 없음.</span>
       </div>
       {history_html}
     </section>
     """
+
+
+def _access_check_local_network_note(enabled: bool) -> str:
+    if not enabled:
+        return ""
+    return "<span>사내 Role 대역표 기준으로 Source IP가 해당 Role 대역 밖이면 경고를 함께 표시합니다.</span>"
 
 
 def _access_check_css() -> str:
@@ -1478,6 +1733,18 @@ def _access_check_css() -> str:
     .access-check-title h2 {
       font-size: 18px;
       margin: 0;
+    }
+    .access-check-limits {
+      background: #fffaeb;
+      border-bottom: 1px solid #fedf89;
+      color: #7a2e0e;
+      display: grid;
+      gap: 4px;
+      font-size: 12px;
+      padding: 10px 15px;
+    }
+    .access-check-limits strong {
+      font-size: 12px;
     }
     .access-check-grid {
       align-items: end;
@@ -1815,7 +2082,7 @@ def _access_check_script(*, history_enabled: bool = False) -> str:
         return;
       }
       if (!accessCheckHistory.length) {
-        accessHistoryElement.innerHTML = '<span class="notice">No access check history.</span>';
+        accessHistoryElement.innerHTML = '<span class="notice">Access Check 이력이 없습니다.</span>';
         return;
       }
       const rows = accessCheckHistory.map((record) => `
@@ -1825,7 +2092,7 @@ def _access_check_script(*, history_enabled: bool = False) -> str:
           <td>${accessEscapeHtml(record.sourceIp || '')}</td>
           <td>${accessEscapeHtml(record.destinationIp || '')}</td>
           <td>${accessEscapeHtml(record.service || '')}</td>
-          <td>${accessEscapeHtml(record.verdict || '')}${record.conditional ? ' (Conditional)' : ''}</td>
+          <td>${accessEscapeHtml(record.verdict || '')}${record.conditional ? ' (조건부)' : ''}</td>
           <td>${accessEscapeHtml(record.acl || '')}${record.sequence ? ` #${accessEscapeHtml(record.sequence)}` : ''}</td>
           <td>${accessEscapeHtml(record.raw || '')}</td>
         </tr>
@@ -1888,7 +2155,7 @@ def _access_check_script(*, history_enabled: bool = False) -> str:
         return {
           matched: true,
           conditional: true,
-          warnings: [`Service auto mode matched a rule limited to ${ruleService}; select the exact service to confirm.`],
+          warnings: [`Service 자동 모드가 ${ruleService} 전용 rule에 매칭되었습니다. 정확한 Service를 선택해 재확인하세요.`],
         };
       }
       return {
@@ -1901,15 +2168,15 @@ def _access_check_script(*, history_enabled: bool = False) -> str:
     function accessActionVerdict(action) {
       const normalized = String(action || '').trim().toLowerCase();
       if (normalized === 'deny') {
-        return { status: 'blocked', label: 'Blocked' };
+        return { status: 'blocked', label: '차단(Blocked)' };
       }
       if (normalized === 'permit') {
-        return { status: 'allowed', label: 'Allowed' };
+        return { status: 'allowed', label: '허용(Allowed)' };
       }
       if (['src-nat', 'dst-nat', 'redirect', 'route', 'tunnel', 'forward'].includes(normalized)) {
-        return { status: 'special', label: 'Allowed with NAT/Special Action' };
+        return { status: 'special', label: 'NAT/특수 Action 허용' };
       }
-      return { status: 'unknown', label: `Unknown action: ${action || 'not parsed'}` };
+      return { status: 'unknown', label: `알 수 없는 action: ${action || 'not parsed'}` };
     }
 
     function accessLocalWarnings(roleData, sourceNumber, sourceText) {
@@ -1922,7 +2189,7 @@ def _access_check_script(*, history_enabled: bool = False) -> str:
         return [];
       }
       const labels = networks.map((network) => network.network || network.label).filter(Boolean).join(', ');
-      return [`Source IP ${sourceText} is outside the local Role Network mapping: ${labels}`];
+      return [`Source IP ${sourceText}가 사내 Role 대역표 범위 밖입니다: ${labels}`];
     }
 
     function accessClearHighlights() {
@@ -1970,7 +2237,7 @@ def _access_check_script(*, history_enabled: bool = False) -> str:
         ? `<ul class="access-warning-list">${warnings.map((warning) => `<li>${accessEscapeHtml(warning)}</li>`).join('')}</ul>`
         : '';
       const rule = result.matchedRule;
-      const conditional = result.conditional ? '<span class="access-conditional">Conditional</span>' : '';
+      const conditional = result.conditional ? '<span class="access-conditional">조건부</span>' : '';
       const ruleHtml = rule
         ? `<div class="access-result-meta">
             <div><strong>ACL</strong>${accessEscapeHtml(rule.acl)}</div>
@@ -1981,7 +2248,7 @@ def _access_check_script(*, history_enabled: bool = False) -> str:
             <div><strong>Destination</strong>${accessEscapeHtml(rule.destination)}</div>
             <div><strong>Raw</strong>${accessEscapeHtml(rule.raw)}</div>
           </div>`
-        : '<div class="access-result-meta"><div><strong>ACL</strong>No ACL rule matched.</div></div>';
+        : '<div class="access-result-meta"><div><strong>ACL</strong>일치한 ACL rule 없음.</div></div>';
       accessResultElement.innerHTML = `
         <div class="access-result-title">
           <span>${accessEscapeHtml(result.verdict || '')}</span>
@@ -2003,21 +2270,21 @@ def _access_check_script(*, history_enabled: bool = False) -> str:
         sourceNumber = accessIpToNumber(sourceText);
         destinationNumber = accessIpToNumber(destinationText);
       } catch (error) {
-        accessRenderResult({ status: 'error', verdict: error.message, warnings: [] });
+        accessRenderResult({ status: 'error', verdict: String(error.message || '').replace('Invalid IPv4 address', 'IPv4 주소 형식 오류'), warnings: [] });
         return;
       }
       const roleData = (accessCheckData.roles || []).find((role) => String(role.role || '').toLowerCase() === roleName.toLowerCase());
       if (!roleData) {
-        accessRenderResult({ status: 'error', verdict: `Role not found: ${roleName}`, warnings: [] });
+        accessRenderResult({ status: 'error', verdict: `Role을 찾을 수 없음: ${roleName}`, warnings: [] });
         return;
       }
       if (!(roleData.rules || []).length) {
         const result = {
           status: 'unknown',
-          verdict: 'No matching Role ACL',
+          verdict: '일치하는 Role ACL 없음',
           conditional: false,
           matchedRule: null,
-          warnings: ['Access Check only evaluates ACLs whose ACL name exactly matches the selected Role.'],
+          warnings: ['Access Check는 선택한 Role 이름과 정확히 같은 ACL만 판정합니다.'],
         };
         accessRenderResult(result);
         accessAddHistoryFromResult(result, {
@@ -2067,11 +2334,11 @@ def _access_check_script(*, history_enabled: bool = False) -> str:
       }
       const warnings = [...localWarnings];
       if (uncertainCount > 0) {
-        warnings.push(`${uncertainCount} rule(s) could not be fully evaluated because alias/name data is incomplete.`);
+        warnings.push(`${uncertainCount}개 rule은 alias/name 데이터가 불완전해 완전 판정하지 못했습니다.`);
       }
       const result = {
         status: 'blocked',
-        verdict: 'Implicit deny',
+        verdict: '기본 차단(Implicit deny)',
         conditional: false,
         matchedRule: null,
         warnings,

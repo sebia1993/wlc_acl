@@ -50,8 +50,11 @@ GUI/CLI 입력
 - Comment 포함 HTML 저장
 - PDF 저장/인쇄
 - HTML Access Check
-- Role network Excel 세션 전용 로드
-- 기본 보안모드에서 Role network Excel 값과 Access Check 이력 미저장
+- 사내 Role 대역표 선택/검증
+- GUI 내부용 보고서에 Role 대역과 WLC 비교 상태 표시
+- Role 대역표 작성법 앱 내부 팝업
+- Role 대역표 샘플 Excel 열기
+- CLI 기본 보안모드에서 Role network Excel 값과 Access Check 이력 미저장
 
 ## 4. 폴더와 파일 역할
 
@@ -92,7 +95,9 @@ wlc_role_acl_collector/
 
 - 입력 필드 배치
 - SSH/Telnet 선택 시 기본 포트 자동 변경
-- Role network Excel 선택
+- 사내 Role 대역표 선택과 사전 검증 요약 표시
+- 사내 Role 대역표 작성법 팝업 표시
+- 샘플 Role 대역표 Excel 열기
 - 수집 시작 버튼 처리
 - 안전 진단 버튼 처리
 - 백그라운드 스레드에서 수집 실행
@@ -107,7 +112,9 @@ wlc_role_acl_collector/
 
 - GUI가 멈추지 않도록 수집 작업은 별도 스레드에서 실행합니다.
 - 비밀번호는 파일에 저장하지 않습니다.
-- Role network Excel 경로와 내부 대역은 run.log에 남기지 않습니다.
+- 사내 Role 대역표를 선택하면 GUI 보고서는 내부용 HTML/Excel에 실제 Role 대역을 포함합니다.
+- 샘플 Excel은 배포본의 실행 파일 옆 `config\role_networks.example.xlsx` 또는 소스 repo의 `config\role_networks.example.xlsx`에서 찾습니다.
+- Role network Excel 전체 경로와 내부 대역은 run.log에 남기지 않습니다.
 - 진단 모드는 `diagnostic_summary.json/html`, `diagnostic_run.log`만 생성하고 raw 폴더를 만들지 않습니다.
 - Windows 다중 모니터와 DPI 배율 차이를 고려해 창 위치/크기를 작업영역 안으로 보정합니다.
 - GUI 색상, 단계 라벨, 주요 문구는 `gui_app.py` 상단 상수에서 관리합니다.
@@ -197,7 +204,7 @@ export_local_role_networks=False
 access_history_enabled=False
 ```
 
-이 기본값 때문에 Role network Excel을 선택해도 기본 HTML/Excel에는 내부 대역이 저장되지 않습니다.
+CLI는 이 기본값을 유지하므로 Role network Excel을 선택해도 `--export-local-role-networks`를 명시하지 않으면 내부 대역이 저장되지 않습니다. GUI는 사내 Role 대역표를 선택한 실행을 내부용 보고서 생성으로 간주해 `export_local_role_networks=True`로 보고서를 만듭니다.
 
 ### `acl_evaluator.py`
 
@@ -208,7 +215,7 @@ Access Check 대상 ACL:
 - ACL 이름이 선택한 Role 이름과 정확히 같은 row만 판정 데이터에 포함합니다.
 - 비교는 앞뒤 공백 제거 후 대소문자 무시 방식으로 수행합니다.
 - `guest-logon` Role 기준 `guest-logon-acl`처럼 이름이 비슷하지만 정확히 같지 않은 ACL은 제외합니다.
-- 대상 ACL이 없으면 `No matching Role ACL` 상태를 표시합니다.
+- 대상 ACL이 없으면 `일치하는 Role ACL 없음` 상태를 표시합니다.
 
 지원하는 Source/Destination 형태:
 
@@ -223,15 +230,15 @@ Service 미선택 동작:
 
 - Source/Destination이 맞는 첫 ACL을 위에서 아래 순서로 자동 매칭합니다.
 - 매칭된 ACL의 service가 `any`이면 확정 판정으로 표시합니다.
-- 매칭된 ACL의 service가 `any`가 아니면 `Conditional`로 표시합니다.
+- 매칭된 ACL의 service가 `any`가 아니면 `조건부`로 표시합니다.
 
 판정 결과:
 
-- `Allowed`
-- `Blocked`
-- `Allowed with NAT/Special Action`
-- `Implicit deny`
-- `Conditional`
+- `허용(Allowed)`
+- `차단(Blocked)`
+- `NAT/특수 Action 허용`
+- `기본 차단(Implicit deny)`
+- `조건부`
 
 주의할 점:
 
@@ -241,6 +248,8 @@ Service 미선택 동작:
 ### `role_networks.py`
 
 사용자가 선택한 Role network Excel을 읽고 검증합니다.
+
+프로그램은 첫 번째 시트만 읽습니다. 샘플 Excel에는 `Role_Networks` 입력 시트와 `작성가이드` 설명 시트가 있지만, 로더는 `Role_Networks`만 사용하므로 설명 시트는 파싱 결과에 영향을 주지 않습니다.
 
 기본 정책:
 
@@ -429,9 +438,9 @@ ACL의 `user`는 “현재 이 Role을 받은 사용자 IP”라는 의미입니
 
 HTML은 WLC에 다시 접속하지 않습니다. 이미 보고서에 들어있는 ACL/Alias 데이터만 사용합니다.
 
-### Role network Excel은 기본 보고서에 저장되지 않습니다.
+### Role network Excel의 export 기본값은 실행 방식별로 다릅니다.
 
-보안모드 기본값 때문입니다. 내부 보관용으로 반드시 넣어야 한다면 CLI의 `--export-local-role-networks` 옵션을 명시적으로 사용해야 합니다.
+GUI에서는 사내 Role 대역표를 선택하면 내부용 보고서에 실제 대역을 표시합니다. CLI는 자동화/외부 검증 흐름을 고려해 기본적으로 저장하지 않으며, 내부 보관용으로 반드시 넣어야 한다면 `--export-local-role-networks` 옵션을 명시적으로 사용해야 합니다.
 
 ### `show user-table`은 참고용입니다.
 
@@ -463,5 +472,7 @@ aos8_parser.py가 그 텍스트를 구조화하고,
 report.py가 HTML/Excel을 만들고,
 acl_evaluator.py가 HTML Access Check 판정 데이터를 준비합니다.
 
-보안상 Role network Excel과 Access Check 이력은 기본적으로 보고서에 저장하지 않습니다.
+GUI에서 사내 Role 대역표를 선택하면 내부용 보고서에 Role 대역과 WLC 비교 상태가 표시됩니다.
+CLI는 보안 기본값을 유지해 `--export-local-role-networks`가 없으면 Role network Excel 값을 보고서에 저장하지 않습니다.
+Access Check 이력은 기본적으로 보고서에 저장하지 않습니다.
 ```

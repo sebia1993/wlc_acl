@@ -1,7 +1,23 @@
 from wlc_role_acl_collector.gui_app import (
+    ADVANCED_OPTIONS_HIDE_LABEL,
+    ADVANCED_OPTIONS_SHOW_LABEL,
     COLLECTION_ACTION_LABEL,
     DIAGNOSTIC_ACTION_LABEL,
+    LOG_HIDE_LABEL,
+    LOG_SHOW_LABEL,
+    OPEN_FOLDER_LABEL,
+    OPEN_HTML_LABEL,
+    OPEN_XLSX_LABEL,
     REPORT_NAME_LABEL,
+    ROLE_NETWORK_EMPTY_STATUS,
+    ROLE_NETWORK_GUIDE_LABEL,
+    ROLE_NETWORK_GUIDE_TEXT,
+    ROLE_NETWORK_HELP,
+    ROLE_NETWORK_LABEL,
+    ROLE_NETWORK_SELECT_LABEL,
+    ROLE_NETWORK_TEMPLATE_LABEL,
+    _find_role_network_template,
+    _role_network_template_candidates,
     STAGE_LABELS,
     STAGE_PROGRESS,
     WLC_IP_LABEL,
@@ -31,25 +47,25 @@ def test_gui_app_importable():
 
 def test_gui_notice_tells_user_to_connect_to_wlc_not_mm():
     assert "Mobility Master(MM)" in WLC_TARGET_NOTICE
-    assert "WLC controller IP" in WLC_TARGET_NOTICE
+    assert "WLC 컨트롤러 IP" in WLC_TARGET_NOTICE
     assert "Hostname" not in WLC_TARGET_NOTICE
 
 
 def test_gui_connection_labels_do_not_imply_hostname_is_required():
     assert WLC_IP_LABEL == "WLC IP"
-    assert REPORT_NAME_LABEL == "Report name (optional)"
+    assert REPORT_NAME_LABEL == "보고서 이름(선택)"
     assert "Hostname" not in WLC_IP_LABEL
 
 
 def test_gui_stage_labels_support_operational_console_flow():
     assert [STAGE_LABELS[key] for key in ("ready", "connecting", "collecting", "reporting", "completed")] == [
-        "Ready",
-        "Connecting",
-        "Collecting",
-        "Reporting",
-        "Completed",
+        "준비",
+        "접속 중",
+        "수집 중",
+        "보고서 생성",
+        "완료",
     ]
-    assert STAGE_LABELS["failed"] == "Failed"
+    assert STAGE_LABELS["failed"] == "실패"
     assert STAGE_PROGRESS == {
         "ready": 0,
         "connecting": 20,
@@ -60,9 +76,38 @@ def test_gui_stage_labels_support_operational_console_flow():
     }
 
 
-def test_gui_actions_include_safe_diagnostic_button():
-    assert COLLECTION_ACTION_LABEL == "Start Collection"
-    assert DIAGNOSTIC_ACTION_LABEL == "Safe Diagnostic"
+def test_gui_actions_prioritize_collection_and_html_result():
+    assert COLLECTION_ACTION_LABEL == "수집 시작"
+    assert DIAGNOSTIC_ACTION_LABEL == "안전 진단"
+    assert ADVANCED_OPTIONS_SHOW_LABEL == "고급 옵션 표시"
+    assert ADVANCED_OPTIONS_HIDE_LABEL == "고급 옵션 숨김"
+    assert LOG_SHOW_LABEL == "수집 로그 표시"
+    assert LOG_HIDE_LABEL == "수집 로그 숨김"
+    assert OPEN_HTML_LABEL == "HTML 보고서 열기"
+    assert OPEN_XLSX_LABEL == "Excel 열기"
+    assert OPEN_FOLDER_LABEL == "결과 폴더 열기"
+
+
+def test_gui_role_network_copy_explains_internal_report_behavior():
+    assert ROLE_NETWORK_LABEL == "사내 Role 대역표"
+    assert ROLE_NETWORK_SELECT_LABEL == "파일 선택"
+    assert ROLE_NETWORK_GUIDE_LABEL == "작성법"
+    assert ROLE_NETWORK_TEMPLATE_LABEL == "샘플 열기"
+    assert "내부용 HTML/Excel 보고서" in ROLE_NETWORK_HELP
+    assert ".xlsx/.xlsm" in ROLE_NETWORK_EMPTY_STATUS
+    assert "필수 컬럼" in ROLE_NETWORK_GUIDE_TEXT
+    assert "10.40.1.0/24" in ROLE_NETWORK_GUIDE_TEXT
+    assert "같은 Role에 여러 대역" in ROLE_NETWORK_GUIDE_TEXT
+    assert "내부망 전용 보고서" in ROLE_NETWORK_GUIDE_TEXT
+
+
+def test_gui_can_find_packaged_role_network_template():
+    candidates = _role_network_template_candidates()
+    template = _find_role_network_template()
+
+    assert any(path.name == "role_networks.example.xlsx" for path in candidates)
+    assert template is not None
+    assert template.name == "role_networks.example.xlsx"
 
 
 def test_log_tag_for_line_classifies_operational_log_levels():
@@ -102,7 +147,7 @@ def test_gui_input_requires_wlc_ip():
     try:
         build_target_from_gui_input(GuiConnectionInput(host="", username="admin", password="secret"))
     except ValueError as exc:
-        assert str(exc) == "WLC IP is required."
+        assert str(exc) == "WLC IP를 입력하세요."
     else:
         raise AssertionError("Expected WLC IP validation error")
 
@@ -162,7 +207,7 @@ def test_format_collection_progress_for_role_command():
         },
     )
 
-    assert status == "Collecting role 2/5: corp-employee"
+    assert status == "Role 수집 2/5: corp-employee"
     assert lines == ["START: rights::corp-employee | show rights corp-employee"]
 
 
@@ -187,8 +232,8 @@ def test_collection_failure_message_includes_failed_command_and_run_log(tmp_path
 
     message = _collection_failure_message("Collection failed", result, run_log)
 
-    assert "Failed command: configuration_effective" in message
-    assert "Command: show configuration effective" in message
+    assert "실패한 명령 ID: configuration_effective" in message
+    assert "명령어: show configuration effective" in message
     assert str(run_log) in message
 
 

@@ -1,0 +1,194 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Create release metadata
+        id: metadata
+        shell: pwsh
+        run: |
+          $projectName = python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['name'])"
+          $kst = [System.TimeZoneInfo]::FindSystemTimeZoneById("Korea Standard Time")
+          $kstNow = [System.TimeZoneInfo]::ConvertTime([System.DateTimeOffset]::UtcNow, $kst)
+          $baseTag = "v{0}" -f $kstNow.ToString("yyyy.MM.dd-HHmmss")
+          $candidate = $baseTag
+          $counter = 1
+
+          while ($true) {
+            $existingTag = git ls-remote --tags origin "refs/tags/$candidate"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to check existing remote tags."
+            }
+            if (-not $existingTag) {
+              break
+            }
+            $candidate = "$baseTag-$counter"
+            $counter += 1
+          }
+
+          $assetName = "${projectName}_${candidate}_windows.zip"
+          "project_name=$projectName" >> $env:GITHUB_OUTPUT
+          "tag=$candidate" >> $env:GITHUB_OUTPUT
+          "asset_name=$assetName" >> $env:GITHUB_OUTPUT
+
+      - name: Run validation
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\validate.ps1
+
+      - name: Build Windows release package
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\build_windows_gui_exe.ps1
+
+      - name: Prepare release assets
+        id: assets
+        shell: pwsh
+        run: |
+          $assetDir = Join-Path $PWD "release_assets"
+          New-Item -ItemType Directory -Force -Path $assetDir | Out-Null
+
+          $sourceZip = Get-ChildItem -Path ".\dist" -Filter "*.zip" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if (-not $sourceZip) {
+            throw "No release zip was generated in dist."
+          }
+
+          $assetName = "${{ steps.metadata.outputs.asset_name }}"
+          $assetPath = Join-Path $assetDir $assetName
+          Copy-Item -LiteralPath $sourceZip.FullName -Destination $assetPath -Force
+
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $assetPath).Hash.ToLowerInvariant()
+          $checksumPath = "$assetPath.sha256"
+          "$hash  $assetName" | Set-Content -LiteralPath $checksumPath -Encoding ASCII
+
+          "asset_path=$assetPath" >> $env:GITHUB_OUTPUT
+          "checksum_path=$checksumPath" >> $env:GITHUB_OUTPUT
+          "checksum=$hash" >> $env:GITHUB_OUTPUT
+          "checksum_name=$assetName.sha256" >> $env:GITHUB_OUTPUT
+
+      - name: Create release notes
+        id: notes
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.metadata.outputs.tag }}"
+          $projectName = "${{ steps.metadata.outputs.project_name }}"
+          $assetName = "${{ steps.metadata.outputs.asset_name }}"
+          $checksum = "${{ steps.assets.outputs.checksum }}"
+          $sha = "${{ github.sha }}"
+          $branch = "${{ github.ref_name }}"
+          $before = "${{ github.event.before }}"
+
+          if ($before -and $before -notmatch "^0+$") {
+            $commitLines = git log --pretty=format:"- %h %s" "$before..$sha"
+          } else {
+            $commitLines = git log --pretty=format:"- %h %s" -n 20 $sha
+          }
+          if (-not $commitLines) {
+            $commitLines = git log --pretty=format:"- %h %s" -n 1 $sha
+          }
+          $commitText = $commitLines -join [Environment]::NewLine
+
+          $notesPath = Join-Path $PWD "release_notes.md"
+          $notes = @"
+          # $projectName $tag
+
+          ## Release metadata
+          - Base commit SHA: $sha
+          - Branch: $branch
+          - Artifact: $assetName
+          - SHA256 checksum: $checksum
+          - Validation command: powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\validate.ps1
+
+          ## Changed commits
+          $commitText
+          "@
+          $notes = $notes -replace "(?m)^          ", ""
+          $notes | Set-Content -LiteralPath $notesPath -Encoding UTF8
+          "notes_path=$notesPath" >> $env:GITHUB_OUTPUT
+
+      - name: Create Git tag
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.metadata.outputs.tag }}" "${{ github.sha }}"
+          git push origin "refs/tags/${{ steps.metadata.outputs.tag }}"
+
+      - name: Create draft GitHub Release
+        id: create_release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.metadata.outputs.tag }}" `
+            "${{ steps.assets.outputs.asset_path }}#${{ steps.metadata.outputs.asset_name }}" `
+            "${{ steps.assets.outputs.checksum_path }}#${{ steps.assets.outputs.checksum_name }}" `
+            --repo "${{ github.repository }}" `
+            --target "${{ github.sha }}" `
+            --title "${{ steps.metadata.outputs.project_name }} ${{ steps.metadata.outputs.tag }}" `
+            --notes-file "${{ steps.notes.outputs.notes_path }}" `
+            --verify-tag `
+            --draft
+
+      - name: Publish GitHub Release
+        id: publish_release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${{ steps.metadata.outputs.tag }}" --repo "${{ github.repository }}" --json tagName,isDraft,assets
+          gh release edit "${{ steps.metadata.outputs.tag }}" `
+            --repo "${{ github.repository }}" `
+            --draft=false `
+            --latest
+
+      - name: Remove incomplete draft release
+        if: failure() && steps.metadata.outputs.tag != '' && steps.publish_release.outcome != 'success'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ steps.metadata.outputs.tag }}"
+
+          gh release delete "$tag" --repo "${{ github.repository }}" --yes --cleanup-tag
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "No draft release was deleted for $tag."
+            $global:LASTEXITCODE = 0
+          }
+
+          git push origin ":refs/tags/$tag"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "No remote tag was deleted for $tag."
+            $global:LASTEXITCODE = 0
+          }

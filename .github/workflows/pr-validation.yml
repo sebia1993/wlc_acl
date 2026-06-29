@@ -1,0 +1,49 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-build:
+    name: Validate and build Windows package
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run validation
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\validate.ps1
+
+      - name: Build Windows release package
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\build_windows_gui_exe.ps1
+
+      - name: Verify package artifact
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem -Path ".\dist" -Filter "*.zip" | Select-Object -First 1
+          if (-not $zip) {
+            throw "No release zip was generated in dist."
+          }
+          if ($zip.Length -le 0) {
+            throw "Release zip is empty: $($zip.FullName)"
+          }
+          Write-Host "Verified package: $($zip.FullName)"

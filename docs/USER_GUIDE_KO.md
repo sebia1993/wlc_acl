@@ -15,8 +15,8 @@
 현재 프로그램은 보안모드가 기본값입니다.
 
 - 장비 IP, ID, Password는 프로그램 실행 시 직접 입력합니다.
-- Role network Excel은 선택해도 기본 보고서에 저장되지 않습니다.
-- Role network Excel의 파일 경로나 내부 대역 값은 run.log에 남기지 않습니다.
+- GUI에서 사내 Role 대역표를 선택하면 내부용 보고서에 실제 Role 대역과 WLC 비교 상태가 표시됩니다.
+- Role 대역표의 전체 파일 경로나 내부 대역 값은 run.log에 남기지 않습니다.
 - HTML Access Check 조회 이력은 기본 저장하지 않습니다.
 - 생성된 보고서에는 WLC에서 수집한 ACL, Alias, 설정 정보가 포함될 수 있으므로 외부 공유 전 반드시 내용을 확인해야 합니다.
 
@@ -30,22 +30,30 @@
 - Enable password가 필요한 환경이면 Enable password
 - 접속 방식: 기본 SSH, 필요 시 Telnet
 - 결과 저장 폴더
-- 선택 사항: 사내에서만 사용하는 Role network Excel
+- 선택 사항: 사내에서만 사용하는 Role 대역표 Excel
 
 장비 접속 대상 주의:
 
 - 이 프로그램은 Mobility Master(MM)가 아니라 실제 WLC 컨트롤러에 접속해야 합니다.
 - MM IP를 입력하면 Role/ACL 수집 결과가 누락되거나 장비 명령 결과가 예상과 다를 수 있습니다.
 
-Role network Excel을 사용할 경우 첫 번째 시트에 아래 컬럼이 있어야 합니다.
+사내 Role 대역표를 사용할 경우 첫 번째 시트에 아래 컬럼이 있어야 합니다. `네트워크 대역`은 CIDR 형식(`10.40.1.0/24`)을 권장합니다.
 
 | 컬럼 | 예시 |
 | --- | --- |
 | Role 이름 | corp-employee |
-| 네트워크 대역 | 10.10.10.0 |
+| 네트워크 대역 | 10.40.1.0/24 |
 | 서브넷마스크 | 255.255.255.0 |
+| 설명 | 본사 임직원 무선 |
+| 소유부서 | 네트워크팀 |
+| 비고 | 내부용 |
+| 마지막 확인일 | 2026-06-29 |
+
+`서브넷마스크`는 CIDR을 쓰지 않고 `10.40.1.0`처럼 네트워크 주소만 입력할 때 필요합니다. `설명`, `소유부서`, `비고`, `마지막 확인일`은 관리용 선택 컬럼이며 보고서 매칭에는 사용하지 않습니다.
 
 Excel 파일은 실제 `.xlsx` 또는 `.xlsm` 형식이어야 합니다. CSV나 구형 `.xls` 파일의 확장자만 `.xlsx`로 바꾸면 열 수 없습니다.
+
+GUI의 `작성법` 버튼을 누르면 앱 내부 팝업으로 작성 규칙과 예시를 확인할 수 있습니다. `샘플 열기` 버튼을 누르면 제공된 `config\role_networks.example.xlsx`가 열립니다. 샘플 파일에는 실제 입력용 `Role_Networks` 시트와 설명용 `작성가이드` 시트가 있습니다. 프로그램은 첫 번째 시트인 `Role_Networks`만 읽습니다.
 
 ## 4. Windows GUI 실행 방법
 
@@ -80,27 +88,44 @@ python -m wlc_role_acl_collector.gui_app
 
 ## 5. GUI 입력 항목 설명
 
-GUI는 정책 운영형 콘솔 구조입니다.
+GUI의 기본 흐름은 `접속 정보 입력 → 수집 시작 → 결과 확인`입니다.
 
-- 왼쪽: WLC 접속 정보, 로그인 정보, 결과 저장 위치, 선택 옵션 입력
-- 오른쪽 위: 현재 수집 상태와 단계 표시
-- 오른쪽 아래: 접속, 명령 실행, 보고서 생성 로그 확인
+- 왼쪽: WLC 접속 정보, 인증 정보, 결과 저장 위치 입력
+- 오른쪽 위: 현재 수집 상태, 단계, `수집 시작`, 결과 열기 버튼 표시
+- 고급 옵션: 사내 Role 대역표, Timeout seconds, 안전 진단
+- 수집 로그: 기본 숨김이며 필요할 때 `수집 로그 표시`로 확인
 - 상단 배지: 보안모드, 읽기 전용 수집, AOS8 WLC 대상 표시
 
 | 항목 | 설명 |
 | --- | --- |
 | WLC IP | 접속할 실제 WLC 컨트롤러 IP. MM이 아님 |
-| Report name (optional) | 보고서에 표시할 이름. 비워두면 `wlc-장비IP` 형태로 자동 지정 |
+| 보고서 이름(선택) | 보고서에 표시할 이름. 비워두면 `wlc-장비IP` 형태로 자동 지정 |
 | Protocol | 기본 `ssh`, 필요 시 `telnet` 선택 |
 | Port | SSH는 기본 22, Telnet은 기본 23 |
 | Username | WLC 로그인 계정 |
 | Password | WLC 로그인 비밀번호 |
 | Enable password | enable 권한 진입이 필요한 경우 입력 |
 | Output | 결과 파일을 저장할 폴더 |
-| Role network Excel (session only) | 선택 사항. 실행 중에만 읽고 기본 보고서에는 저장하지 않음 |
+
+아래 항목은 `고급 옵션 표시`를 눌렀을 때 나타납니다.
+
+| 항목 | 설명 |
+| --- | --- |
+| 사내 Role 대역표 | 선택 사항. 선택하면 내부용 HTML/Excel 보고서에 실제 Role 대역과 WLC 비교 상태 표시 |
 | Timeout seconds | 명령어 응답 대기 시간. 장비가 느리면 90초 이상으로 증가 |
+| 안전 진단 | 원본 장비 출력 없이 접속/명령 단계와 오류 코드만 확인 |
+
+`사내 Role 대역표` 영역에는 세 가지 버튼이 있습니다.
+
+| 버튼 | 설명 |
+| --- | --- |
+| 파일 선택 | 실제 사내 Role 대역표 Excel을 선택하고 즉시 검증 |
+| 작성법 | 앱 내부 팝업으로 필수 컬럼, CIDR 예시, 오류 방지법 확인 |
+| 샘플 열기 | 제공된 `role_networks.example.xlsx` 템플릿 열기 |
 
 입력이 끝나면 `수집 시작` 버튼을 누릅니다.
+
+수집이 완료되면 `HTML 보고서 열기` 버튼을 먼저 눌러 결과를 확인합니다. Excel 원본 표가 필요하면 `Excel 열기`, 실행 폴더나 run.log가 필요하면 `결과 폴더 열기`를 사용합니다.
 
 다중 모니터 사용 시 참고:
 
@@ -131,6 +156,8 @@ GUI는 정책 운영형 콘솔 구조입니다.
 
 HTML 파일을 브라우저로 열면 Role별 ACL을 확인할 수 있습니다.
 
+- 첫 화면의 `결론 요약`에서 확인 필요 건수, Unresolved, 동적 Role 가능성, 사내 Role 대역 비교 상태를 먼저 확인합니다.
+- `Role ACL Detail`에서 실제 ACL 행을 확인합니다.
 - 상단 Role 버튼을 클릭하면 해당 Role의 ACL 목록이 보입니다.
 - 사용자가 많은 Role이 앞쪽에 배치됩니다.
 - 사용자가 0명인 Role은 기본 숨김 처리될 수 있으며, 필요 시 `Show zero-user roles`로 표시합니다.
@@ -149,7 +176,7 @@ ACL 행마다 Comment 입력란이 있습니다.
 
 ## 9. Access Check 사용 방법
 
-HTML 보고서의 Access Check 영역에서 특정 Role 기준 허용/차단 여부를 확인할 수 있습니다.
+HTML 보고서 하단의 Access Check 영역에서 특정 Role 기준 허용/차단 여부를 보조로 확인할 수 있습니다.
 
 Access Check는 선택한 Role 안에서 ACL 이름이 Role 이름과 정확히 같은 ACL만 검사합니다. 예를 들어 Role이 `guest-logon`이면 ACL 이름도 정확히 `guest-logon`인 항목만 판정 대상입니다. `guest-logon-acl`처럼 비슷하지만 이름이 다른 ACL은 Role ACL Detail에는 보일 수 있지만 Access Check 판정에는 사용하지 않습니다.
 
@@ -162,40 +189,49 @@ Role ACL Detail에서 Role 버튼을 클릭하면 Access Check의 Role 선택값
 | Role | 확인할 사용자 Role |
 | Source IP | 사용자 또는 단말의 출발지 IP |
 | Destination IP | 접근하려는 목적지 IP |
-| Service | 선택 사항. 기본값은 자동 매칭이며, Source/Destination이 맞는 ACL을 위에서 아래 순서로 찾습니다. 특정 service ACL에 매칭되면 Conditional로 표시됩니다. |
+| Service | 선택 사항. 기본값은 `자동 - Source/Destination 기준`이며, Source/Destination이 맞는 ACL을 위에서 아래 순서로 찾습니다. 특정 service ACL에 매칭되면 조건부로 표시됩니다. |
 
 결과 의미:
 
 | 결과 | 의미 |
 | --- | --- |
-| Allowed | permit ACL에 매칭됨 |
-| Blocked | deny ACL에 매칭됨 |
-| Allowed with NAT/Special Action | src-nat, dst-nat, redirect, route, tunnel, forward 같은 특수 action에 매칭됨 |
-| Implicit deny | 매칭되는 ACL이 없어 기본 차단으로 판단 |
-| Conditional | Service 자동 매칭 상태에서 특정 service ACL에 매칭되어 추가 확인이 필요 |
-| No matching Role ACL | Role 이름과 정확히 같은 ACL이 없어 Access Check로 판정할 수 없음 |
+| 허용(Allowed) | permit ACL에 매칭됨 |
+| 차단(Blocked) | deny ACL에 매칭됨 |
+| NAT/특수 Action 허용 | src-nat, dst-nat, redirect, route, tunnel, forward 같은 특수 action에 매칭됨 |
+| 기본 차단(Implicit deny) | 매칭되는 ACL이 없어 기본 차단으로 판단 |
+| 조건부 | Service 자동 매칭 상태에서 특정 service ACL에 매칭되어 추가 확인이 필요 |
+| 일치하는 Role ACL 없음 | Role 이름과 정확히 같은 ACL이 없어 Access Check로 판정할 수 없음 |
 
 중요한 제한:
 
 - Access Check는 보고서 안에 포함된 ACL/Alias 데이터를 기준으로 판단합니다.
 - Access Check는 ACL 이름이 Role 이름과 정확히 같은 ACL만 검사합니다.
-- Service를 선택하지 않으면 `Auto - match by source/destination` 모드로 동작하며, ACL 표시 순서대로 첫 번째 Source/Destination 매칭 규칙을 찾습니다.
+- Service를 선택하지 않으면 `자동 - Source/Destination 기준` 모드로 동작하며, ACL 표시 순서대로 첫 번째 Source/Destination 매칭 규칙을 찾습니다.
 - Service 자동 매칭 결과가 `any`가 아닌 특정 service ACL이면 조건부 판정으로 표시합니다.
 - Service object의 실제 TCP/UDP 포트까지 세부 해석하는 기능은 아직 포함되어 있지 않습니다.
 - 보안모드에서는 Access Check 이력이 HTML이나 브라우저 저장소에 기본 저장되지 않습니다.
-- 보안모드에서는 Role network Excel의 로컬 대역이 HTML에 포함되지 않으므로, HTML 단독으로는 “Source IP가 해당 Role 대역에 속하는지”까지 검증하지 않습니다.
+- 사내 Role 대역표를 선택한 내부용 보고서에서는 Source IP가 해당 Role 대역 밖인지 경고합니다. 대역표를 선택하지 않은 보고서에서는 HTML 단독으로 “Source IP가 해당 Role 대역에 속하는지”까지 검증하지 않습니다.
 
-## 10. Role network Excel 사용 방식
+## 10. 사내 Role 대역표 사용 방식
 
-Role network Excel은 사내망에서만 선택하는 보조 파일입니다.
+사내 Role 대역표는 사내망에서만 선택하는 내부 기준 파일입니다. 프로그램 안에 저장하지 말고, 사내에서 관리하는 표준 Excel 원본을 실행할 때 선택하는 방식을 권장합니다.
 
-기본 동작:
+GUI 기본 동작:
 
-- 프로그램 실행 중에만 읽습니다.
-- HTML/Excel 보고서에는 저장하지 않습니다.
-- run.log에 파일 경로나 대역 값을 남기지 않습니다.
+- 선택 즉시 Excel 형식과 대역 값을 검증합니다.
+- 로드된 Role 수, 대역 수, 중복 제외 건수를 화면에 표시합니다.
+- 수집 후 내부용 HTML/Excel 보고서에 실제 Role 대역과 WLC 비교 상태를 표시합니다.
+- HTML 상단에 `내부망 전용 보고서` 안내가 표시됩니다.
+- run.log에는 파일 경로나 대역 값을 남기지 않고 로드 행 수만 기록합니다.
 
-CLI에서 내부 보관용 보고서에 Role network를 반드시 포함해야 하는 경우에만 아래 옵션을 사용합니다.
+샘플 Excel 구성:
+
+| 시트 | 용도 |
+| --- | --- |
+| Role_Networks | 실제 프로그램이 읽는 입력 시트 |
+| 작성가이드 | 작성 규칙, 예시, 주의사항 안내 시트 |
+
+CLI는 기본적으로 대역표를 보고서에 내보내지 않습니다. CLI에서 내부 보관용 보고서에 Role network를 포함해야 하는 경우에만 아래 옵션을 사용합니다.
 
 ```powershell
 python -m wlc_role_acl_collector collect --role-networks config\role_networks.example.xlsx --export-local-role-networks
@@ -222,8 +258,9 @@ GUI에서 실행하는 경우:
 
 1. `WlcRoleAclCollectorGUI.exe`를 실행합니다.
 2. 평소 수집과 동일하게 `WLC IP`, `Protocol`, `Port`, `Username`, `Password`를 입력합니다.
-3. `Safe Diagnostic` 버튼을 누릅니다.
-4. 완료 후 `Open HTML` 또는 `Open Folder`로 진단 결과를 확인합니다.
+3. `고급 옵션 표시`를 누릅니다.
+4. `안전 진단` 버튼을 누릅니다.
+5. 완료 후 `HTML 보고서 열기` 또는 `결과 폴더 열기`로 진단 결과를 확인합니다.
 
 GUI 진단 모드는 수집 보고서용 raw 폴더를 만들지 않습니다. 결과 파일에는 단계, 오류 코드, command_id, 안전한 조치 안내만 포함됩니다.
 

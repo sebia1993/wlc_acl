@@ -9,6 +9,7 @@ from __future__ import annotations
 import ipaddress
 import re
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,15 @@ from .models import RoleNetworkDefinition
 
 class RoleNetworkDefinitionError(ValueError):
     pass
+
+
+@dataclass(frozen=True)
+class RoleNetworkLoadSummary:
+    definitions: list[RoleNetworkDefinition]
+    role_count: int
+    network_count: int
+    duplicate_count: int
+    source_file: str
 
 
 _EXCEL_FORMAT_HINT = (
@@ -62,8 +72,12 @@ _HEADER_ALIASES = {
 
 
 def load_role_network_definitions(path: Path | str | None) -> list[RoleNetworkDefinition]:
+    return load_role_network_definitions_with_summary(path).definitions
+
+
+def load_role_network_definitions_with_summary(path: Path | str | None) -> RoleNetworkLoadSummary:
     if path is None:
-        return []
+        return RoleNetworkLoadSummary([], role_count=0, network_count=0, duplicate_count=0, source_file="")
 
     source = Path(path)
     _validate_excel_file(source)
@@ -91,6 +105,7 @@ def load_role_network_definitions(path: Path | str | None) -> list[RoleNetworkDe
     errors: list[str] = []
     definitions: list[RoleNetworkDefinition] = []
     seen: set[tuple[str, str]] = set()
+    duplicate_count = 0
 
     for row_number, row in enumerate(rows[header_index + 1 :], start=header_index + 2):
         if _row_is_blank(row):
@@ -98,7 +113,8 @@ def load_role_network_definitions(path: Path | str | None) -> list[RoleNetworkDe
 
         role = _cell_text(_cell_at(row, columns["role"]))
         network_text = _cell_text(_cell_at(row, columns["network"]))
-        mask_text = _cell_text(_cell_at(row, columns["subnet_mask"]))
+        mask_column = columns.get("subnet_mask")
+        mask_text = _cell_text(_cell_at(row, mask_column)) if mask_column is not None else ""
 
         if not role:
             errors.append(f"row {row_number}: Role name is required.")
@@ -115,6 +131,7 @@ def load_role_network_definitions(path: Path | str | None) -> list[RoleNetworkDe
 
         dedupe_key = (role.casefold(), cidr)
         if dedupe_key in seen:
+            duplicate_count += 1
             continue
         seen.add(dedupe_key)
         definitions.append(
@@ -132,7 +149,13 @@ def load_role_network_definitions(path: Path | str | None) -> list[RoleNetworkDe
         raise RoleNetworkDefinitionError("; ".join(errors[:8]) + suffix)
     if not definitions:
         raise RoleNetworkDefinitionError("Role network Excel file does not contain any mapping rows.")
-    return definitions
+    return RoleNetworkLoadSummary(
+        definitions=definitions,
+        role_count=len({definition.role.casefold() for definition in definitions}),
+        network_count=len(definitions),
+        duplicate_count=duplicate_count,
+        source_file=str(source),
+    )
 
 
 def _validate_excel_file(source: Path) -> None:
@@ -186,7 +209,8 @@ def _resolve_columns(header_row: tuple[Any, ...]) -> dict[str, int]:
             None,
         )
         if match is None:
-            missing.append(column_name)
+            if column_name != "subnet_mask":
+                missing.append(column_name)
         else:
             columns[column_name] = match
     if missing:

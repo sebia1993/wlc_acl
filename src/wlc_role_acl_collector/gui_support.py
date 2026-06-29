@@ -21,28 +21,28 @@ class GuiConnectionInput:
 def build_target_from_gui_input(values: GuiConnectionInput) -> ControllerTarget:
     host = values.host.strip()
     if not host:
-        raise ValueError("WLC IP is required.")
+        raise ValueError("WLC IP를 입력하세요.")
 
     protocol = values.protocol.strip().lower() or "ssh"
     if protocol not in {"ssh", "telnet"}:
-        raise ValueError("Protocol must be SSH or Telnet.")
+        raise ValueError("Protocol은 SSH 또는 Telnet이어야 합니다.")
 
     port_text = values.port.strip()
     if port_text:
         try:
             port = int(port_text)
         except ValueError as exc:
-            raise ValueError("Port must be a number.") from exc
+            raise ValueError("Port는 숫자로 입력하세요.") from exc
         if not 1 <= port <= 65535:
-            raise ValueError("Port must be between 1 and 65535.")
+            raise ValueError("Port는 1에서 65535 사이여야 합니다.")
     else:
         port = default_port_for_protocol(protocol)
 
     username = values.username.strip()
     if not username:
-        raise ValueError("Username is required.")
+        raise ValueError("Username을 입력하세요.")
     if not values.password:
-        raise ValueError("Password is required.")
+        raise ValueError("Password를 입력하세요.")
 
     name = values.name.strip() or f"wlc-{host}"
     controller = Controller(

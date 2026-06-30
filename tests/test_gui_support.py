@@ -1,3 +1,5 @@
+import inspect
+
 import customtkinter as ctk
 
 from wlc_role_acl_collector.gui_app import (
@@ -9,12 +11,16 @@ from wlc_role_acl_collector.gui_app import (
     CUSTOMTKINTER_COLOR_THEME,
     DEFAULT_WINDOW_SIZE,
     DIAGNOSTIC_ACTION_LABEL,
+    DIAGNOSTIC_LOG_MENU_LABEL,
     LOG_HIDE_LABEL,
     LOG_SHOW_LABEL,
+    MENU_LABELS,
     OPEN_FOLDER_LABEL,
     OPEN_HTML_LABEL,
     OPEN_XLSX_LABEL,
+    COLLECTION_MENU_LABEL,
     REPORT_NAME_LABEL,
+    REPORT_MANAGEMENT_MENU_LABEL,
     ROLE_NETWORK_EMPTY_STATUS,
     ROLE_NETWORK_GUIDE_LABEL,
     ROLE_NETWORK_GUIDE_TEXT,
@@ -22,6 +28,9 @@ from wlc_role_acl_collector.gui_app import (
     ROLE_NETWORK_LABEL,
     ROLE_NETWORK_SELECT_LABEL,
     ROLE_NETWORK_TEMPLATE_LABEL,
+    SETTINGS_MENU_LABEL,
+    SIDEBAR_WIDTH,
+    SSH_STATUS_LABEL,
     _find_role_network_template,
     _role_network_template_candidates,
     _role_networks_status_message,
@@ -60,6 +69,24 @@ def test_gui_uses_customtkinter_dark_blue_app_shell():
     assert DEFAULT_WINDOW_SIZE == (1100, 750)
     assert CUSTOMTKINTER_APPEARANCE_MODE == "Dark"
     assert CUSTOMTKINTER_COLOR_THEME == "blue"
+
+
+def test_gui_dashboard_navigation_uses_sidebar_and_tabview():
+    assert MENU_LABELS == (
+        SETTINGS_MENU_LABEL,
+        COLLECTION_MENU_LABEL,
+        DIAGNOSTIC_LOG_MENU_LABEL,
+        REPORT_MANAGEMENT_MENU_LABEL,
+    )
+    assert MENU_LABELS == ("설정", "수집 및 분석", "진단 로그", "보고서 관리")
+    assert SSH_STATUS_LABEL == "SSH Status"
+    assert SIDEBAR_WIDTH >= 220
+
+    layout_source = inspect.getsource(WlcRoleAclCollectorGui._layout)
+    sidebar_source = inspect.getsource(WlcRoleAclCollectorGui._sidebar)
+
+    assert "CTkTabview" in layout_source
+    assert "sidebar_menu_buttons" in sidebar_source
 
 
 def test_gui_notice_tells_user_to_connect_to_wlc_not_mm():

@@ -59,6 +59,20 @@ LOG_INFO = "#93c5fd"
 LOG_SUCCESS = "#86efac"
 LOG_WARNING = "#fcd34d"
 LOG_ERROR = "#fca5a5"
+SIDEBAR_BG = "#0f172a"
+SIDEBAR_ACTIVE_BG = "#1d4ed8"
+SIDEBAR_WIDTH = 244
+SETTINGS_MENU_LABEL = "설정"
+COLLECTION_MENU_LABEL = "수집 및 분석"
+DIAGNOSTIC_LOG_MENU_LABEL = "진단 로그"
+REPORT_MANAGEMENT_MENU_LABEL = "보고서 관리"
+MENU_LABELS = (
+    SETTINGS_MENU_LABEL,
+    COLLECTION_MENU_LABEL,
+    DIAGNOSTIC_LOG_MENU_LABEL,
+    REPORT_MANAGEMENT_MENU_LABEL,
+)
+SSH_STATUS_LABEL = "SSH Status"
 
 ctk.set_appearance_mode(CUSTOMTKINTER_APPEARANCE_MODE)
 ctk.set_default_color_theme(CUSTOMTKINTER_COLOR_THEME)
@@ -217,6 +231,7 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         self.log_visible = False
         self._fit_after_id: str | None = None
         self.stage_label_widgets: dict[str, ctk.CTkLabel] = {}
+        self.sidebar_menu_buttons: dict[str, ctk.CTkButton] = {}
         self.last_run_dir: Path | None = None
         self.last_html: Path | None = None
         self.last_xlsx: Path | None = None
@@ -235,6 +250,7 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         self.timeout_var = tk.IntVar(value=60)
         self.status_var = tk.StringVar(value="준비되었습니다. 접속 정보를 입력한 뒤 수집을 시작하세요.")
         self.stage_var = tk.StringVar(value=STAGE_LABELS["ready"])
+        self.ssh_status_var = tk.StringVar(value="대기")
 
         self._style()
         self._set_initial_window_bounds()
@@ -297,17 +313,67 @@ class WlcRoleAclCollectorGui(ctk.CTk):
 
     def _layout(self) -> None:
         root = ctk.CTkFrame(self, fg_color=APP_BG, corner_radius=0)
-        root.pack(fill="both", expand=True, padx=18, pady=18)
-        root.grid_columnconfigure(0, weight=1)
-        root.grid_rowconfigure(1, weight=1)
+        root.pack(fill="both", expand=True, padx=16, pady=16)
+        root.grid_columnconfigure(0, weight=0, minsize=SIDEBAR_WIDTH)
+        root.grid_columnconfigure(1, weight=1)
+        root.grid_rowconfigure(0, weight=1)
 
-        header = ctk.CTkFrame(
+        sidebar = ctk.CTkFrame(
             root,
-            fg_color=PANEL_BG,
+            fg_color=SIDEBAR_BG,
             border_width=1,
             border_color=LINE_COLOR,
             corner_radius=8,
+            width=SIDEBAR_WIDTH,
         )
+        sidebar.grid(row=0, column=0, sticky="ns")
+        sidebar.grid_propagate(False)
+        sidebar.grid_columnconfigure(0, weight=1)
+        sidebar.grid_rowconfigure(1, weight=1)
+        self._sidebar(sidebar)
+
+        main = ctk.CTkFrame(root, fg_color=APP_BG, corner_radius=0)
+        main.grid(row=0, column=1, sticky="nsew", padx=(14, 0))
+        main.grid_columnconfigure(0, weight=1)
+        main.grid_rowconfigure(1, weight=1)
+
+        self._main_header(main)
+
+        self.main_tabview = ctk.CTkTabview(
+            main,
+            fg_color=PANEL_BG,
+            border_width=1,
+            border_color=LINE_COLOR,
+            segmented_button_fg_color=CONTROL_BG,
+            segmented_button_selected_color=ACCENT_COLOR,
+            segmented_button_selected_hover_color=ACCENT_ACTIVE_COLOR,
+            segmented_button_unselected_color=CONTROL_BG,
+            segmented_button_unselected_hover_color=CONTROL_HOVER_BG,
+            text_color=TEXT_COLOR,
+            command=self._on_main_tab_changed,
+            anchor="w",
+        )
+        self.main_tabview.grid(row=1, column=0, sticky="nsew", pady=(14, 0))
+
+        settings_tab = self.main_tabview.add(SETTINGS_MENU_LABEL)
+        collection_tab = self.main_tabview.add(COLLECTION_MENU_LABEL)
+        diagnostic_tab = self.main_tabview.add(DIAGNOSTIC_LOG_MENU_LABEL)
+        report_tab = self.main_tabview.add(REPORT_MANAGEMENT_MENU_LABEL)
+        for tab in (settings_tab, collection_tab, diagnostic_tab, report_tab):
+            tab.configure(fg_color=PANEL_BG)
+            tab.grid_columnconfigure(0, weight=1)
+            tab.grid_rowconfigure(0, weight=1)
+
+        self._build_settings_tab(settings_tab)
+        self._build_collection_tab(collection_tab)
+        self._build_diagnostic_tab(diagnostic_tab)
+        self._build_report_tab(report_tab)
+        self._sync_advanced_options()
+        self._sync_log_panel()
+        self._select_menu_tab(COLLECTION_MENU_LABEL)
+
+    def _main_header(self, parent: tk.Widget) -> None:
+        header = ctk.CTkFrame(parent, fg_color=PANEL_BG, border_width=1, border_color=LINE_COLOR, corner_radius=8)
         header.grid(row=0, column=0, sticky="ew")
         header.grid_columnconfigure(0, weight=1)
         header.grid_columnconfigure(1, weight=0)
@@ -331,26 +397,105 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         self._pill(badge_row, "읽기 전용", SUCCESS_SOFT_BG, SUCCESS_COLOR).pack(side="left", padx=(0, 7))
         self._pill(badge_row, "AOS8 WLC", PANEL_SUBTLE_BG, TEXT_COLOR).pack(side="left")
 
-        body = ctk.CTkFrame(root, fg_color=APP_BG, corner_radius=0)
-        body.grid(row=1, column=0, sticky="nsew", pady=(14, 0))
-        body.grid_columnconfigure(0, weight=0, minsize=360)
-        body.grid_columnconfigure(1, weight=1)
-        body.grid_rowconfigure(0, weight=1)
+    def _sidebar(self, parent: tk.Widget) -> None:
+        brand = ctk.CTkFrame(parent, fg_color="transparent")
+        brand.grid(row=0, column=0, sticky="ew", padx=16, pady=(18, 14))
+        brand.grid_columnconfigure(1, weight=1)
+        logo = ctk.CTkLabel(
+            brand,
+            text="A",
+            width=42,
+            height=42,
+            fg_color=ACCENT_COLOR,
+            text_color="#ffffff",
+            corner_radius=8,
+            font=("Segoe UI Semibold", 20),
+        )
+        logo.grid(row=0, column=0, rowspan=2, sticky="w")
+        ctk.CTkLabel(
+            brand,
+            text="Aruba WLC",
+            text_color=TEXT_COLOR,
+            font=("Segoe UI Semibold", 15),
+            anchor="w",
+        ).grid(row=0, column=1, sticky="ew", padx=(10, 0))
+        ctk.CTkLabel(
+            brand,
+            text="Ops Analyzer v2.0",
+            text_color=MUTED_COLOR,
+            font=("Segoe UI", 10),
+            anchor="w",
+        ).grid(row=1, column=1, sticky="ew", padx=(10, 0), pady=(2, 0))
 
-        left = ctk.CTkFrame(
-            body,
-            fg_color=PANEL_BG,
+        nav = ctk.CTkFrame(parent, fg_color="transparent")
+        nav.grid(row=1, column=0, sticky="new", padx=12, pady=(6, 0))
+        nav.grid_columnconfigure(0, weight=1)
+        for index, label in enumerate(MENU_LABELS):
+            button = self._sidebar_button(nav, label)
+            button.grid(row=index, column=0, sticky="ew", pady=(0, 8))
+            self.sidebar_menu_buttons[label] = button
+
+        status = ctk.CTkFrame(
+            parent,
+            fg_color=PANEL_SUBTLE_BG,
             border_width=1,
             border_color=LINE_COLOR,
             corner_radius=8,
-            width=360,
         )
-        left.grid(row=0, column=0, sticky="ns")
-        left.grid_rowconfigure(0, weight=1)
-        left.grid_columnconfigure(0, weight=1)
-        left.grid_propagate(False)
+        status.grid(row=2, column=0, sticky="ew", padx=12, pady=(12, 14))
+        status.grid_columnconfigure(1, weight=1)
+        self.ssh_status_dot = ctk.CTkFrame(status, width=10, height=10, fg_color=MUTED_COLOR, corner_radius=5)
+        self.ssh_status_dot.grid(row=0, column=0, sticky="w", padx=(12, 8), pady=12)
+        self.ssh_status_dot.grid_propagate(False)
+        text = ctk.CTkFrame(status, fg_color="transparent")
+        text.grid(row=0, column=1, sticky="ew", pady=10)
+        ctk.CTkLabel(
+            text,
+            text=SSH_STATUS_LABEL,
+            text_color=MUTED_COLOR,
+            font=("Segoe UI Semibold", 9),
+            anchor="w",
+        ).pack(anchor="w")
+        ctk.CTkLabel(
+            text,
+            textvariable=self.ssh_status_var,
+            text_color=TEXT_COLOR,
+            font=("Segoe UI", 10),
+            anchor="w",
+        ).pack(anchor="w", pady=(2, 0))
 
-        form = self._scrollable_form(left)
+    def _sidebar_button(self, parent: tk.Widget, label: str) -> ctk.CTkButton:
+        return ctk.CTkButton(
+            parent,
+            text=label,
+            command=lambda name=label: self._select_menu_tab(name),
+            height=40,
+            corner_radius=6,
+            fg_color="transparent",
+            hover_color=CONTROL_HOVER_BG,
+            text_color=TEXT_COLOR,
+            anchor="w",
+            font=("Segoe UI Semibold", 11),
+        )
+
+    def _select_menu_tab(self, label: str) -> None:
+        self.main_tabview.set(label)
+        self._set_active_sidebar_menu(label)
+
+    def _on_main_tab_changed(self) -> None:
+        self._set_active_sidebar_menu(self.main_tabview.get())
+
+    def _set_active_sidebar_menu(self, active_label: str) -> None:
+        for label, button in self.sidebar_menu_buttons.items():
+            if label == active_label:
+                button.configure(fg_color=SIDEBAR_ACTIVE_BG, text_color="#ffffff")
+            else:
+                button.configure(fg_color="transparent", text_color=TEXT_COLOR)
+
+    def _build_settings_tab(self, parent: tk.Widget) -> None:
+        parent.grid_columnconfigure(0, weight=1)
+        parent.grid_rowconfigure(0, weight=1)
+        form = self._scrollable_form(parent)
 
         self._section_label(form, "1. 접속 정보")
         self._notice(form, WLC_TARGET_NOTICE)
@@ -376,47 +521,96 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         self._section_label(self.advanced_options_container, "고급 옵션")
         self._role_networks_row(self.advanced_options_container)
         self._timeout_row(self.advanced_options_container)
-        self._section_label(self.advanced_options_container, "문제 해결")
-        ctk.CTkLabel(
-            self.advanced_options_container,
-            text="원본 장비 출력 없이 접속/명령 단계와 오류 코드만 확인할 때 사용합니다.",
-            text_color=MUTED_COLOR,
-            font=("Segoe UI", 9),
-            wraplength=295,
-            anchor="w",
-            justify="left",
-        ).pack(anchor="w", pady=(0, 7))
-        self.diagnostic_button = self._button(
-            self.advanced_options_container,
-            text=DIAGNOSTIC_ACTION_LABEL,
-            command=self._start_diagnostic,
-        )
-        self.diagnostic_button.pack(fill="x", pady=(0, 8))
 
-        right = ctk.CTkFrame(body, fg_color=APP_BG, corner_radius=0)
-        right.grid(row=0, column=1, sticky="nsew", padx=(14, 0))
-        right.grid_columnconfigure(0, weight=1)
-        right.grid_rowconfigure(1, weight=1)
+    def _build_collection_tab(self, parent: tk.Widget) -> None:
+        content = ctk.CTkFrame(parent, fg_color="transparent")
+        content.grid(row=0, column=0, sticky="nsew", padx=18, pady=18)
+        content.grid_columnconfigure(0, weight=1)
+        content.grid_rowconfigure(1, weight=1)
 
         status_panel = ctk.CTkFrame(
-            right,
-            fg_color=PANEL_BG,
+            content,
+            fg_color=PANEL_SUBTLE_BG,
             border_width=1,
             border_color=LINE_COLOR,
             corner_radius=8,
         )
         status_panel.grid(row=0, column=0, sticky="ew")
         self._status_panel(status_panel)
-        self._action_panel(status_panel)
+        self._collection_action_panel(status_panel)
 
-        self.log_panel = ctk.CTkFrame(
-            right,
-            fg_color=PANEL_BG,
+        guide = ctk.CTkFrame(
+            content,
+            fg_color=LOG_BG,
             border_width=1,
             border_color=LINE_COLOR,
             corner_radius=8,
         )
-        self.log_panel.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
+        guide.grid(row=1, column=0, sticky="nsew", pady=(14, 0))
+        guide.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            guide,
+            text="수집 및 분석 작업 영역",
+            text_color=TEXT_COLOR,
+            font=("Segoe UI Semibold", 14),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 4))
+        ctk.CTkLabel(
+            guide,
+            text="설정 탭에서 WLC 접속 정보와 사내 Role 대역표를 준비한 뒤 수집을 시작하세요. 진행 단계와 결과 상태는 이 화면에서 추적합니다.",
+            text_color=MUTED_COLOR,
+            font=("Segoe UI", 10),
+            wraplength=680,
+            justify="left",
+            anchor="w",
+        ).grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 16))
+
+    def _build_diagnostic_tab(self, parent: tk.Widget) -> None:
+        content = ctk.CTkFrame(parent, fg_color="transparent")
+        content.grid(row=0, column=0, sticky="nsew", padx=18, pady=18)
+        content.grid_columnconfigure(0, weight=1)
+        content.grid_rowconfigure(1, weight=1)
+
+        diagnostic_panel = ctk.CTkFrame(
+            content,
+            fg_color=PANEL_SUBTLE_BG,
+            border_width=1,
+            border_color=LINE_COLOR,
+            corner_radius=8,
+        )
+        diagnostic_panel.grid(row=0, column=0, sticky="ew")
+        diagnostic_panel.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            diagnostic_panel,
+            text="안전 진단",
+            text_color=TEXT_COLOR,
+            font=("Segoe UI Semibold", 13),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 0))
+        ctk.CTkLabel(
+            diagnostic_panel,
+            text="원본 장비 출력 없이 접속/명령 단계와 오류 코드만 확인할 때 사용합니다.",
+            text_color=MUTED_COLOR,
+            font=("Segoe UI", 10),
+            wraplength=680,
+            justify="left",
+            anchor="w",
+        ).grid(row=1, column=0, sticky="ew", padx=16, pady=(4, 10))
+        self.diagnostic_button = self._button(
+            diagnostic_panel,
+            text=DIAGNOSTIC_ACTION_LABEL,
+            command=self._start_diagnostic,
+        )
+        self.diagnostic_button.grid(row=2, column=0, sticky="w", padx=16, pady=(0, 14))
+
+        self.log_panel = ctk.CTkFrame(
+            content,
+            fg_color=LOG_BG,
+            border_width=1,
+            border_color=LINE_COLOR,
+            corner_radius=8,
+        )
+        self.log_panel.grid(row=1, column=0, sticky="nsew", pady=(14, 0))
         self.log_panel.grid_columnconfigure(0, weight=1)
         self.log_panel.grid_rowconfigure(1, weight=1)
         top = ctk.CTkFrame(self.log_panel, fg_color="transparent")
@@ -440,8 +634,48 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         self.log_text.grid(row=1, column=0, sticky="nsew", padx=14, pady=(10, 14))
         self._configure_log_tags()
         self.log_text.configure(state="disabled")
-        self._sync_advanced_options()
-        self._sync_log_panel()
+
+    def _build_report_tab(self, parent: tk.Widget) -> None:
+        content = ctk.CTkFrame(parent, fg_color="transparent")
+        content.grid(row=0, column=0, sticky="nsew", padx=18, pady=18)
+        content.grid_columnconfigure(0, weight=1)
+        content.grid_rowconfigure(1, weight=1)
+
+        report_panel = ctk.CTkFrame(
+            content,
+            fg_color=PANEL_SUBTLE_BG,
+            border_width=1,
+            border_color=LINE_COLOR,
+            corner_radius=8,
+        )
+        report_panel.grid(row=0, column=0, sticky="ew")
+        self._report_panel(report_panel)
+
+        detail = ctk.CTkFrame(
+            content,
+            fg_color=LOG_BG,
+            border_width=1,
+            border_color=LINE_COLOR,
+            corner_radius=8,
+        )
+        detail.grid(row=1, column=0, sticky="nsew", pady=(14, 0))
+        detail.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            detail,
+            text="보고서 관리 작업 영역",
+            text_color=TEXT_COLOR,
+            font=("Segoe UI Semibold", 14),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 4))
+        ctk.CTkLabel(
+            detail,
+            text="수집 또는 안전 진단이 완료되면 HTML, Excel, 결과 폴더 버튼이 활성화됩니다. 외부 공유 전에는 내부 Role 대역 정보 포함 여부를 확인하세요.",
+            text_color=MUTED_COLOR,
+            font=("Segoe UI", 10),
+            wraplength=680,
+            justify="left",
+            anchor="w",
+        ).grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 16))
 
     def _pill(self, parent: tk.Widget, text: str, bg: str, fg: str) -> ctk.CTkLabel:
         return ctk.CTkLabel(
@@ -503,15 +737,12 @@ class WlcRoleAclCollectorGui(ctk.CTk):
             self.advanced_toggle_button.configure(text=ADVANCED_OPTIONS_SHOW_LABEL)
 
     def _toggle_log_panel(self) -> None:
-        self.log_visible = not self.log_visible
+        self.log_visible = True
+        self._select_menu_tab(DIAGNOSTIC_LOG_MENU_LABEL)
         self._sync_log_panel()
 
     def _sync_log_panel(self) -> None:
-        if self.log_visible:
-            self.log_panel.grid()
-            self.log_toggle_button.configure(text=LOG_HIDE_LABEL)
-        else:
-            self.log_panel.grid_remove()
+        if hasattr(self, "log_toggle_button"):
             self.log_toggle_button.configure(text=LOG_SHOW_LABEL)
 
     def _status_panel(self, parent: tk.Widget) -> None:
@@ -574,7 +805,7 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         )
         self.log_toggle_button.pack(anchor="w", padx=16, pady=(10, 0))
 
-    def _action_panel(self, parent: tk.Widget) -> None:
+    def _collection_action_panel(self, parent: tk.Widget) -> None:
         ctk.CTkLabel(parent, text="수집 실행", text_color=MUTED_COLOR, font=("Segoe UI Semibold", 9)).pack(
             anchor="w", padx=16, pady=(13, 0)
         )
@@ -590,8 +821,20 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         )
         self.start_button.grid(row=0, column=0, sticky="ew")
 
-        ctk.CTkLabel(parent, text="결과 확인", text_color=MUTED_COLOR, font=("Segoe UI Semibold", 9)).pack(
-            anchor="w", padx=16, pady=(13, 0)
+    def _report_panel(self, parent: tk.Widget) -> None:
+        ctk.CTkLabel(parent, text="결과 확인", text_color=TEXT_COLOR, font=("Segoe UI Semibold", 13)).pack(
+            anchor="w", padx=16, pady=(14, 0)
+        )
+        ctk.CTkLabel(
+            parent,
+            text="마지막 실행 결과를 열거나 결과 폴더로 이동합니다.",
+            text_color=MUTED_COLOR,
+            font=("Segoe UI", 10),
+            anchor="w",
+            justify="left",
+        ).pack(anchor="w", fill="x", padx=16, pady=(4, 0))
+        ctk.CTkLabel(parent, text="보고서 파일", text_color=MUTED_COLOR, font=("Segoe UI Semibold", 9)).pack(
+            anchor="w", padx=16, pady=(14, 0)
         )
 
         outputs = ctk.CTkFrame(parent, fg_color="transparent")
@@ -885,6 +1128,7 @@ class WlcRoleAclCollectorGui(ctk.CTk):
     def _set_stage(self, stage: str) -> None:
         label = STAGE_LABELS.get(stage, STAGE_LABELS["ready"])
         self.stage_var.set(label)
+        self._set_ssh_status_for_stage(stage)
         if hasattr(self, "progress"):
             self.progress.set(STAGE_PROGRESS.get(stage, 0) / 100)
         active_index = STAGE_SEQUENCE.index(stage) if stage in STAGE_SEQUENCE else -1
@@ -900,6 +1144,27 @@ class WlcRoleAclCollectorGui(ctk.CTk):
                 widget.configure(fg_color=ACCENT_SOFT_BG, text_color=ACCENT_DARK_COLOR)
             else:
                 widget.configure(fg_color=PANEL_SUBTLE_BG, text_color=MUTED_COLOR)
+
+    def _set_ssh_status_for_stage(self, stage: str) -> None:
+        if not hasattr(self, "ssh_status_dot"):
+            return
+        if stage == "connecting":
+            status_text = "연결 중"
+            status_color = WARNING_COLOR
+        elif stage in {"collecting", "reporting"}:
+            status_text = "연결됨"
+            status_color = SUCCESS_COLOR
+        elif stage == "completed":
+            status_text = "완료"
+            status_color = SUCCESS_COLOR
+        elif stage == "failed":
+            status_text = "실패"
+            status_color = DANGER_COLOR
+        else:
+            status_text = "대기"
+            status_color = MUTED_COLOR
+        self.ssh_status_var.set(status_text)
+        self.ssh_status_dot.configure(fg_color=status_color)
 
     def _configure_log_tags(self) -> None:
         self.log_text.tag_config("normal", foreground=LOG_TEXT)

@@ -9,6 +9,7 @@ from __future__ import annotations
 import ctypes
 import os
 import queue
+import re
 import subprocess
 import sys
 import threading
@@ -54,13 +55,21 @@ WARNING_COLOR = "#fcd34d"
 WARNING_SOFT_BG = "#422006"
 DANGER_COLOR = "#fca5a5"
 DANGER_SOFT_BG = "#450a0a"
-LOG_BG = "#020617"
-LOG_TEXT = "#dbeafe"
-LOG_MUTED = "#94a3b8"
-LOG_INFO = "#93c5fd"
-LOG_SUCCESS = "#86efac"
-LOG_WARNING = "#fcd34d"
-LOG_ERROR = "#fca5a5"
+LOG_BG = "#151515"
+LOG_TEXT = "#DCDCDC"
+LOG_MUTED = "#9CA3AF"
+LOG_INFO = "#60A5FA"
+LOG_SUCCESS = "#4ADE80"
+LOG_WARNING = "#FACC15"
+LOG_ERROR = "#F87171"
+LOG_FONT = ("Consolas", 12)
+LOG_LEVEL_TAGS = {
+    "[INFO]": "info",
+    "[SUCCESS]": "success",
+    "[ERROR]": "error",
+    "[WARNING]": "warning",
+}
+LOG_LEVEL_PATTERN = re.compile(r"(\[(?:INFO|SUCCESS|ERROR|WARNING)\])")
 SIDEBAR_BG = "#0f172a"
 SIDEBAR_ACTIVE_BG = "#1d4ed8"
 SIDEBAR_WIDTH = 244
@@ -703,7 +712,7 @@ class WlcRoleAclCollectorGui(ctk.CTk):
             border_width=1,
             border_color=LINE_COLOR,
             corner_radius=8,
-            font=("Consolas", 10),
+            font=LOG_FONT,
         )
         self.log_text.grid(row=1, column=0, sticky="nsew", padx=14, pady=(10, 14))
         self._configure_log_tags()
@@ -1543,7 +1552,10 @@ class WlcRoleAclCollectorGui(ctk.CTk):
 
     def _log(self, text: str) -> None:
         self.log_text.configure(state="normal")
-        self.log_text.insert("end", f"{text}\n", (_log_tag_for_line(text),))
+        for segment, tag in _log_segments_for_line(text):
+            if segment:
+                self.log_text.insert("end", segment, (tag,))
+        self.log_text.insert("end", "\n", ("normal",))
         self.log_text.see("end")
         self.log_text.configure(state="disabled")
 
@@ -1566,6 +1578,16 @@ class WlcRoleAclCollectorGui(ctk.CTk):
 
 
 def _log_tag_for_line(text: str) -> str:
+    stripped = text.strip()
+    upper = stripped.upper()
+    if upper.startswith("[ERROR]"):
+        return "error"
+    if upper.startswith("[WARNING]"):
+        return "warning"
+    if upper.startswith("[SUCCESS]"):
+        return "success"
+    if upper.startswith("[INFO]"):
+        return "info"
     normalized = text.strip().lower()
     if normalized.startswith("error:") or " failed" in normalized or normalized.startswith("failed"):
         return "error"
@@ -1580,6 +1602,24 @@ def _log_tag_for_line(text: str) -> str:
     if normalized.startswith(("run log:", "controller:", "wlc ip:", "protocol:", "port:", "timeout")):
         return "muted"
     return "normal"
+
+
+def _log_segments_for_line(text: str) -> list[tuple[str, str]]:
+    starts_with_level = bool(LOG_LEVEL_PATTERN.match(text.strip()))
+    base_tag = _log_tag_for_line(text) if starts_with_level or not LOG_LEVEL_PATTERN.search(text) else "normal"
+    segments: list[tuple[str, str]] = []
+    cursor = 0
+    for match in LOG_LEVEL_PATTERN.finditer(text):
+        if match.start() > cursor:
+            segments.append((text[cursor : match.start()], base_tag))
+        token = match.group(1).upper()
+        segments.append((text[match.start() : match.end()], LOG_LEVEL_TAGS[token]))
+        cursor = match.end()
+    if cursor < len(text):
+        segments.append((text[cursor:], base_tag))
+    if not segments:
+        segments.append((text, base_tag))
+    return segments
 
 
 def format_collection_progress(event: str, payload: dict[str, object]) -> tuple[str, list[str]]:

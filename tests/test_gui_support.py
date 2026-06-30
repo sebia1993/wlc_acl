@@ -12,8 +12,16 @@ from wlc_role_acl_collector.gui_app import (
     DEFAULT_WINDOW_SIZE,
     DIAGNOSTIC_ACTION_LABEL,
     DIAGNOSTIC_LOG_MENU_LABEL,
+    LOG_BG,
+    LOG_ERROR,
+    LOG_FONT,
     LOG_HIDE_LABEL,
+    LOG_INFO,
+    LOG_LEVEL_TAGS,
     LOG_SHOW_LABEL,
+    LOG_SUCCESS,
+    LOG_TEXT,
+    LOG_WARNING,
     MENU_LABELS,
     OPEN_FOLDER_LABEL,
     OPEN_HTML_LABEL,
@@ -42,6 +50,7 @@ from wlc_role_acl_collector.gui_app import (
     WLC_TARGET_NOTICE,
     _collection_failure_message,
     _constrain_window_rect,
+    _log_segments_for_line,
     _log_tag_for_line,
     _write_run_log,
     format_collection_progress,
@@ -196,12 +205,48 @@ def test_gui_role_network_status_includes_selected_sheet_and_fallback_notice():
 
 
 def test_log_tag_for_line_classifies_operational_log_levels():
+    assert LOG_BG == "#151515"
+    assert LOG_TEXT == "#DCDCDC"
+    assert LOG_FONT == ("Consolas", 12)
+    assert LOG_INFO == "#60A5FA"
+    assert LOG_SUCCESS == "#4ADE80"
+    assert LOG_ERROR == "#F87171"
+    assert LOG_WARNING == "#FACC15"
+    assert LOG_LEVEL_TAGS == {
+        "[INFO]": "info",
+        "[SUCCESS]": "success",
+        "[ERROR]": "error",
+        "[WARNING]": "warning",
+    }
+    assert _log_tag_for_line("[INFO] Connecting to WLC") == "info"
+    assert _log_tag_for_line("[SUCCESS] Report generated") == "success"
+    assert _log_tag_for_line("[ERROR] Authentication failed") == "error"
+    assert _log_tag_for_line("[WARNING] Slow controller response") == "warning"
     assert _log_tag_for_line("ERROR: Authentication failed") == "error"
     assert _log_tag_for_line("DONE: configuration_effective | show configuration effective | 100 chars") == "success"
     assert _log_tag_for_line("START: rights::corp | show rights corp") == "info"
     assert _log_tag_for_line("DIAG: DGN-CMD | OK") == "info"
     assert _log_tag_for_line("Diagnostic HTML: C:\\temp\\diagnostic_summary.html") == "success"
     assert _log_tag_for_line("WLC IP: 10.10.10.10") == "muted"
+
+
+def test_log_segments_highlight_bracketed_status_tokens():
+    assert _log_segments_for_line("[INFO] show rights corp") == [
+        ("[INFO]", "info"),
+        (" show rights corp", "info"),
+    ]
+    assert _log_segments_for_line("Result [SUCCESS] report generated") == [
+        ("Result ", "normal"),
+        ("[SUCCESS]", "success"),
+        (" report generated", "normal"),
+    ]
+    assert _log_segments_for_line("Check [WARNING] timeout then [ERROR] failed") == [
+        ("Check ", "normal"),
+        ("[WARNING]", "warning"),
+        (" timeout then ", "normal"),
+        ("[ERROR]", "error"),
+        (" failed", "normal"),
+    ]
 
 
 def test_default_gui_output_dir_is_documents_folder():

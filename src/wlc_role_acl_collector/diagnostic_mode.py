@@ -15,7 +15,7 @@ from .diagnostic_events import DiagnosticEvent, event_from_code, safe_info_event
 from .diagnostic_report import write_diagnostic_report
 from .models import ControllerTarget
 from .redaction import redaction_self_test
-from .report import build_parsed_controllers, timestamp_slug
+from .report import build_parsed_controllers, create_run_dir
 
 
 @dataclass(frozen=True)
@@ -33,7 +33,7 @@ def run_diagnostic(
     timeout: int = 60,
     offline_raw_dir: Path | None = None,
 ) -> DiagnosticRun:
-    run_dir = output_root / timestamp_slug()
+    run_dir = create_run_dir(output_root, label=target.controller.name)
     events: list[DiagnosticEvent] = []
 
     def finish(code: str | DiagnosticCode) -> DiagnosticRun:

@@ -70,6 +70,10 @@ jobs:
         shell: pwsh
         run: powershell -NoProfile -ExecutionPolicy Bypass -File .\build_windows_gui_exe.ps1
 
+      - name: Verify Windows release package
+        shell: pwsh
+        run: python .\tools\verify_release_package.py --dist .\dist --smoke-cli
+
       - name: Prepare release assets
         id: assets
         shell: pwsh
@@ -96,6 +100,14 @@ jobs:
           "checksum_path=$checksumPath" >> $env:GITHUB_OUTPUT
           "checksum=$hash" >> $env:GITHUB_OUTPUT
           "checksum_name=$assetName.sha256" >> $env:GITHUB_OUTPUT
+
+      - name: Verify release assets
+        shell: pwsh
+        run: |
+          python .\tools\verify_release_package.py `
+            --zip "${{ steps.assets.outputs.asset_path }}" `
+            --sha256 "${{ steps.assets.outputs.checksum_path }}" `
+            --smoke-cli
 
       - name: Create Korean release notes
         id: notes

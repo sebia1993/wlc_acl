@@ -22,7 +22,22 @@ from .models import CollectionResult, ParsedController, RoleNetworkDefinition
 
 
 def timestamp_slug() -> str:
-    return datetime.now().strftime("%Y%m%d_%H%M%S")
+    return datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+
+
+def create_run_dir(output_root: Path, *, label: str = "") -> Path:
+    output_root.mkdir(parents=True, exist_ok=True)
+    label_suffix = f"_{_safe_file_name(label)}" if label else ""
+    base_name = f"{timestamp_slug()}{label_suffix}"
+    for counter in range(1000):
+        name = base_name if counter == 0 else f"{base_name}_{counter:03d}"
+        candidate = output_root / name
+        try:
+            candidate.mkdir()
+            return candidate
+        except FileExistsError:
+            continue
+    raise RuntimeError(f"Unable to create a unique run directory under {output_root}")
 
 
 def write_raw_result(result: CollectionResult, raw_dir: Path) -> Path:

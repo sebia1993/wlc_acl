@@ -53,8 +53,13 @@ def collect_from_controller(
         if credentials.enable_password:
             try:
                 connection.enable()
-            except Exception:
-                pass
+                result.commands.append(CommandOutput(command_id="enable", command="enable", output="enable succeeded"))
+                _emit(progress_callback, "command_done", command_id="enable", command="enable", output_length=0)
+            except Exception as exc:
+                result.commands.append(
+                    CommandOutput(command_id="enable", command="enable", success=False, error=str(exc))
+                )
+                _emit(progress_callback, "command_error", command_id="enable", command="enable", error=str(exc))
 
         # 기본 명령은 보고서 생성에 필요한 최소 입력값입니다.
         # 특히 configuration_effective가 없으면 Role/ACL/Alias 탐색을 계속할 수 없습니다.

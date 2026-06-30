@@ -10,7 +10,7 @@ from .diagnostic_mode import run_diagnostic
 from .interactive import prompt_controller_targets
 from .mock_server import run_mock_server
 from .models import ControllerTarget
-from .report import build_parsed_controllers, timestamp_slug, write_raw_result, write_reports
+from .report import build_parsed_controllers, create_run_dir, write_raw_result, write_reports
 from .role_networks import RoleNetworkDefinitionError, load_role_network_definitions
 
 
@@ -84,7 +84,7 @@ def _collect(args: argparse.Namespace) -> int:
         return 2
 
     targets = _resolve_targets(args)
-    run_dir = args.output_dir / timestamp_slug()
+    run_dir = create_run_dir(args.output_dir)
     raw_dir = run_dir / "raw"
 
     results = []

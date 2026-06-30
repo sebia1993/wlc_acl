@@ -25,7 +25,7 @@ from .diagnostic_mode import run_diagnostic
 from .diagnostics import classify_error_message, summarize_collection_failure
 from .gui_support import GuiConnectionInput, build_target_from_gui_input, default_gui_output_dir
 from .models import CollectionResult, CommandOutput, ParsedController, RoleNetworkDefinition
-from .report import build_parsed_controllers, timestamp_slug, write_raw_result, write_reports
+from .report import build_parsed_controllers, create_run_dir, write_raw_result, write_reports
 from .role_networks import RoleNetworkDefinitionError, RoleNetworkLoadSummary, load_role_network_definitions_with_summary
 
 
@@ -1542,7 +1542,7 @@ class WlcRoleAclCollectorGui(ctk.CTk):
     def _run_collection_worker(self, target, output_dir: Path, timeout: int, role_networks) -> None:
         # 일반 수집 모드는 문제 분석을 위해 raw 명령 결과를 로컬 run_dir 아래에 저장합니다.
         # 단, user-table처럼 민감정보가 많은 출력은 report.py에서 원문 저장을 막습니다.
-        run_dir = output_dir / timestamp_slug()
+        run_dir = create_run_dir(output_dir, label=target.controller.name)
         log_lines = [
             "WLC Role ACL Collector run log",
             f"Controller: {target.controller.name}",

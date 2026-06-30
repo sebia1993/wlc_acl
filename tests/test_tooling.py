@@ -1,5 +1,7 @@
+import hashlib
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 
@@ -48,6 +50,44 @@ def test_release_zip_includes_guides():
     assert "SECURITY_MODEL_KO.md" in text
 
 
+def test_verify_release_package_checks_zip_contents_and_checksum(tmp_path):
+    repo_root = Path(__file__).parents[1]
+    script = repo_root / "tools" / "verify_release_package.py"
+    zip_path = tmp_path / "WlcRoleAclCollectorGUI_v0.1.0.zip"
+    required_entries = [
+        "WlcRoleAclCollectorGUI.exe",
+        "WlcRoleAclCollectorCLI.exe",
+        "USER_GUIDE_KO.md",
+        "USER_GUIDE_KO.html",
+        "DEVELOPER_GUIDE_KO.md",
+        "DEVELOPER_GUIDE_KO.html",
+        "ERROR_CODES_KO.md",
+        "ERROR_CODES_KO.html",
+        "DIAGNOSTIC_MODE_KO.md",
+        "DIAGNOSTIC_MODE_KO.html",
+        "SECURITY_MODEL_KO.md",
+        "SECURITY_MODEL_KO.html",
+        "config/role_networks.example.xlsx",
+        "config/mock_scenarios/auth_failed.json",
+        "config/mock_scenarios/missing_config.json",
+        "config/mock_scenarios/permission_denied.json",
+        "config/mock_scenarios/success_minimal.json",
+    ]
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        for entry in required_entries:
+            archive.writestr(entry, "fixture")
+
+    digest = hashlib.sha256(zip_path.read_bytes()).hexdigest()
+    checksum_path = tmp_path / f"{zip_path.name}.sha256"
+    checksum_path.write_text(f"{digest}  {zip_path.name}\n", encoding="ascii")
+
+    subprocess.run(
+        [sys.executable, str(script), "--zip", str(zip_path), "--sha256", str(checksum_path)],
+        check=True,
+        cwd=repo_root,
+    )
+
+
 def test_generate_doc_html_outputs_browser_files(tmp_path):
     repo_root = Path(__file__).parents[1]
     script = repo_root / "tools" / "generate_doc_html.py"
@@ -91,6 +131,7 @@ def test_github_actions_split_pr_validation_and_release():
     assert "branches: [main]" in pr_workflow
     assert validation_command in pr_workflow
     assert build_command in pr_workflow
+    assert "python .\\tools\\verify_release_package.py --dist .\\dist --smoke-cli" in pr_workflow
     assert "gh release" not in pr_workflow
 
     assert "push:" in release_workflow
@@ -100,6 +141,8 @@ def test_github_actions_split_pr_validation_and_release():
     assert "yyyy.MM.dd-HHmmss" in release_workflow
     assert validation_command in release_workflow
     assert build_command in release_workflow
+    assert "python .\\tools\\verify_release_package.py --dist .\\dist --smoke-cli" in release_workflow
+    assert "--sha256 \"${{ steps.assets.outputs.checksum_path }}\"" in release_workflow
     assert "Get-FileHash -Algorithm SHA256" in release_workflow
     assert "git tag" in release_workflow
     assert 'git push origin "refs/tags/' in release_workflow

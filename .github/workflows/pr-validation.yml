@@ -38,12 +38,4 @@ jobs:
 
       - name: Verify package artifact
         shell: pwsh
-        run: |
-          $zip = Get-ChildItem -Path ".\dist" -Filter "*.zip" | Select-Object -First 1
-          if (-not $zip) {
-            throw "No release zip was generated in dist."
-          }
-          if ($zip.Length -le 0) {
-            throw "Release zip is empty: $($zip.FullName)"
-          }
-          Write-Host "Verified package: $($zip.FullName)"
+        run: python .\tools\verify_release_package.py --dist .\dist --smoke-cli

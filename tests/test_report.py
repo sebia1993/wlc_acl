@@ -10,9 +10,24 @@ from wlc_role_acl_collector.report import (
     _is_role_related_acl,
     _write_html,
     build_parsed_controllers,
+    create_run_dir,
     write_raw_result,
     write_reports,
 )
+
+
+def test_create_run_dir_adds_safe_label_and_collision_suffix(monkeypatch, tmp_path):
+    import wlc_role_acl_collector.report as report
+
+    monkeypatch.setattr(report, "timestamp_slug", lambda: "20260630_120000_000001")
+
+    first = create_run_dir(tmp_path, label="inside/wlc")
+    second = create_run_dir(tmp_path, label="inside/wlc")
+
+    assert first.name == "20260630_120000_000001_inside_wlc"
+    assert second.name == "20260630_120000_000001_inside_wlc_001"
+    assert first.is_dir()
+    assert second.is_dir()
 
 
 def test_write_excel_and_html_report(tmp_path):

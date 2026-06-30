@@ -99,6 +99,8 @@ LOG_HIDE_LABEL = "수집 로그 숨김"
 OPEN_HTML_LABEL = "HTML 보고서 열기"
 OPEN_XLSX_LABEL = "Excel 열기"
 OPEN_FOLDER_LABEL = "결과 폴더 열기"
+REPORT_COMPLETE_TITLE = "보고서 생성 완료"
+REPORT_COMPLETE_MESSAGE = "보고서 생성이 완료되었습니다"
 ROLE_NETWORK_LABEL = "사내 Role 대역표(Excel)"
 ROLE_NETWORK_HELP = (
     "선택하면 내부용 HTML/Excel 보고서에 실제 Role 대역과 WLC 비교 상태를 표시합니다."
@@ -263,6 +265,7 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         self.status_var = tk.StringVar(value="준비되었습니다. 접속 정보를 입력한 뒤 수집을 시작하세요.")
         self.stage_var = tk.StringVar(value=STAGE_LABELS["ready"])
         self.ssh_status_var = tk.StringVar(value="대기")
+        self.running_progress_title_var = tk.StringVar(value="데이터 수집 진행 중")
 
         self._style()
         self._set_initial_window_bounds()
@@ -380,8 +383,10 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         self._build_collection_tab(collection_tab)
         self._build_diagnostic_tab(diagnostic_tab)
         self._build_report_tab(report_tab)
+        self._bottom_progress_bar(main)
         self._sync_advanced_options()
         self._sync_log_panel()
+        self._sync_running_progress(False)
         self._select_menu_tab(COLLECTION_MENU_LABEL)
 
     def _main_header(self, parent: tk.Widget) -> None:
@@ -820,6 +825,55 @@ class WlcRoleAclCollectorGui(ctk.CTk):
             font=("Segoe UI", 10),
         )
 
+    def _bottom_progress_bar(self, parent: tk.Widget) -> None:
+        self.running_progress_panel = ctk.CTkFrame(
+            parent,
+            fg_color=PANEL_SUBTLE_BG,
+            border_width=1,
+            border_color=LINE_COLOR,
+            corner_radius=8,
+        )
+        self.running_progress_panel.grid(row=2, column=0, sticky="ew", pady=(12, 0))
+        self.running_progress_panel.grid_columnconfigure(0, weight=1)
+
+        header = ctk.CTkFrame(self.running_progress_panel, fg_color="transparent")
+        header.grid(row=0, column=0, sticky="ew", padx=14, pady=(10, 5))
+        header.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            header,
+            textvariable=self.running_progress_title_var,
+            text_color=TEXT_COLOR,
+            font=("Segoe UI Semibold", 10),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(
+            header,
+            textvariable=self.stage_var,
+            text_color=ACCENT_DARK_COLOR,
+            font=("Segoe UI Semibold", 9),
+            anchor="e",
+        ).grid(row=0, column=1, sticky="e")
+
+        self.running_progress = ctk.CTkProgressBar(
+            self.running_progress_panel,
+            height=12,
+            corner_radius=6,
+            fg_color=CONTROL_BG,
+            progress_color=RUN_ACTION_COLOR,
+            mode="determinate",
+        )
+        self.running_progress.grid(row=1, column=0, sticky="ew", padx=14, pady=(0, 12))
+        self.running_progress.set(0)
+        self.running_progress_panel.grid_remove()
+
+    def _sync_running_progress(self, running: bool) -> None:
+        if not hasattr(self, "running_progress_panel"):
+            return
+        if running:
+            self.running_progress_panel.grid()
+        else:
+            self.running_progress_panel.grid_remove()
+
     def _toggle_advanced_options(self) -> None:
         self.advanced_options_visible = not self.advanced_options_visible
         self._sync_advanced_options()
@@ -1232,6 +1286,8 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         self._set_ssh_status_for_stage(stage)
         if hasattr(self, "progress"):
             self.progress.set(STAGE_PROGRESS.get(stage, 0) / 100)
+        if hasattr(self, "running_progress"):
+            self.running_progress.set(STAGE_PROGRESS.get(stage, 0) / 100)
         active_index = STAGE_SEQUENCE.index(stage) if stage in STAGE_SEQUENCE else -1
         for index, step in enumerate(STAGE_SEQUENCE):
             widget = self.stage_label_widgets.get(step)
@@ -1292,6 +1348,7 @@ class WlcRoleAclCollectorGui(ctk.CTk):
             return
 
         output_dir = Path(self.output_dir_var.get().strip() or "outputs")
+        self.running_progress_title_var.set("데이터 수집 진행 중")
         self._set_running(True)
         self._log("수집을 시작합니다.")
         self.worker = threading.Thread(
@@ -1312,6 +1369,7 @@ class WlcRoleAclCollectorGui(ctk.CTk):
             return
 
         output_dir = Path(self.output_dir_var.get().strip() or "outputs")
+        self.running_progress_title_var.set("안전 진단 진행 중")
         self._set_running(True)
         self._log("안전 진단을 시작합니다.")
         self.worker = threading.Thread(
@@ -1483,7 +1541,7 @@ class WlcRoleAclCollectorGui(ctk.CTk):
                     self._set_stage("completed")
                     self._set_running(False)
                     self._set_result_buttons(folder_enabled=True, report_enabled=True)
-                    messagebox.showinfo("완료", "보고서 생성이 완료되었습니다.\nHTML 보고서를 먼저 확인하세요.")
+                    self._show_report_complete_dialog(paths)
                 elif event == "diagnostic_done":
                     paths = payload
                     primary_code = str(paths.get("primary_code", "WLC-UNK-001"))
@@ -1527,6 +1585,7 @@ class WlcRoleAclCollectorGui(ctk.CTk):
 
     def _set_running(self, running: bool) -> None:
         self.is_running = running
+        self._sync_running_progress(running)
         for button in self.start_buttons:
             button.configure(state="disabled" if running else "normal")
         self.diagnostic_button.configure(state="disabled" if running else "normal")
@@ -1536,6 +1595,80 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         else:
             if self.stage_var.get() not in {STAGE_LABELS["completed"], STAGE_LABELS["failed"]}:
                 self._set_stage("ready")
+
+    def _show_report_complete_dialog(self, paths: dict[str, Path]) -> None:
+        window = ctk.CTkToplevel(self)
+        window.title(REPORT_COMPLETE_TITLE)
+        window.configure(fg_color=APP_BG)
+        window.transient(self)
+        window.resizable(False, False)
+
+        container = ctk.CTkFrame(
+            window,
+            fg_color=PANEL_BG,
+            border_width=1,
+            border_color=LINE_COLOR,
+            corner_radius=8,
+        )
+        container.pack(fill="both", expand=True, padx=16, pady=16)
+
+        badge = ctk.CTkLabel(
+            container,
+            text="완료",
+            fg_color=SUCCESS_SOFT_BG,
+            text_color=SUCCESS_COLOR,
+            font=("Segoe UI Semibold", 10),
+            height=30,
+            corner_radius=6,
+        )
+        badge.pack(anchor="w", padx=18, pady=(18, 10))
+
+        ctk.CTkLabel(
+            container,
+            text=REPORT_COMPLETE_MESSAGE,
+            text_color=TEXT_COLOR,
+            font=("Segoe UI Semibold", 17),
+            anchor="w",
+        ).pack(anchor="w", fill="x", padx=18)
+        ctk.CTkLabel(
+            container,
+            text="HTML 보고서를 먼저 확인하고, 필요하면 Excel 파일과 결과 폴더를 함께 검토하세요.",
+            text_color=MUTED_COLOR,
+            font=("Segoe UI", 10),
+            wraplength=420,
+            justify="left",
+            anchor="w",
+        ).pack(anchor="w", fill="x", padx=18, pady=(6, 16))
+
+        actions = ctk.CTkFrame(container, fg_color="transparent")
+        actions.pack(fill="x", padx=18, pady=(0, 18))
+        actions.grid_columnconfigure(0, weight=1)
+        actions.grid_columnconfigure(1, weight=1)
+        html_path = paths.get("html")
+        run_dir = paths.get("run_dir")
+        self._button(
+            actions,
+            text=OPEN_HTML_LABEL,
+            variant="primary",
+            command=lambda: _open_path(html_path) if html_path else None,
+        ).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        self._button(
+            actions,
+            text=OPEN_FOLDER_LABEL,
+            command=lambda: _open_path(run_dir) if run_dir else None,
+        ).grid(row=0, column=1, sticky="ew", padx=(6, 0))
+        self._button(actions, text="닫기", command=window.destroy).grid(
+            row=1, column=0, columnspan=2, sticky="ew", pady=(8, 0)
+        )
+
+        window.update_idletasks()
+        width = 500
+        height = 245
+        x = self.winfo_x() + max(0, (self.winfo_width() - width) // 2)
+        y = self.winfo_y() + max(0, (self.winfo_height() - height) // 2)
+        window.geometry(f"{width}x{height}+{x}+{y}")
+        window.focus_set()
+        window.grab_set()
 
     def _set_result_buttons(
         self,

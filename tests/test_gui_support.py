@@ -29,6 +29,8 @@ from wlc_role_acl_collector.gui_app import (
     COLLECTION_MENU_LABEL,
     REPORT_NAME_LABEL,
     REPORT_MANAGEMENT_MENU_LABEL,
+    REPORT_COMPLETE_MESSAGE,
+    REPORT_COMPLETE_TITLE,
     ROLE_NETWORK_EMPTY_STATUS,
     ROLE_NETWORK_GUIDE_LABEL,
     ROLE_NETWORK_GUIDE_TEXT,
@@ -128,6 +130,43 @@ def test_gui_stage_labels_support_operational_console_flow():
         "completed": 100,
         "failed": 100,
     }
+
+
+def test_gui_collection_runs_in_worker_thread_and_progress_is_bottom_panel():
+    start_source = inspect.getsource(WlcRoleAclCollectorGui._start_collection)
+    worker_source = inspect.getsource(WlcRoleAclCollectorGui._run_collection_worker)
+    layout_source = inspect.getsource(WlcRoleAclCollectorGui._layout)
+    progress_source = inspect.getsource(WlcRoleAclCollectorGui._bottom_progress_bar)
+    running_source = inspect.getsource(WlcRoleAclCollectorGui._set_running)
+    diagnostic_source = inspect.getsource(WlcRoleAclCollectorGui._start_diagnostic)
+
+    assert "threading.Thread" in start_source
+    assert "target=self._run_collection_worker" in start_source
+    assert "daemon=True" in start_source
+    assert 'self.running_progress_title_var.set("데이터 수집 진행 중")' in start_source
+    assert 'self.running_progress_title_var.set("안전 진단 진행 중")' in diagnostic_source
+    assert "progress_callback=progress" in worker_source
+    assert 'self.event_queue.put(("stage"' in worker_source
+    assert "self._bottom_progress_bar(main)" in layout_source
+    assert "CTkProgressBar" in progress_source
+    assert "textvariable=self.running_progress_title_var" in progress_source
+    assert "self.running_progress_panel.grid(row=2" in progress_source
+    assert "self.running_progress_panel.grid_remove()" in progress_source
+    assert "self._sync_running_progress(running)" in running_source
+
+
+def test_gui_uses_customtkinter_completion_dialog_instead_of_native_info_box():
+    drain_source = inspect.getsource(WlcRoleAclCollectorGui._drain_events)
+    dialog_source = inspect.getsource(WlcRoleAclCollectorGui._show_report_complete_dialog)
+
+    assert REPORT_COMPLETE_TITLE == "보고서 생성 완료"
+    assert REPORT_COMPLETE_MESSAGE == "보고서 생성이 완료되었습니다"
+    assert "messagebox.showinfo(\"완료\"" not in drain_source
+    assert "self._show_report_complete_dialog(paths)" in drain_source
+    assert "CTkToplevel" in dialog_source
+    assert "REPORT_COMPLETE_MESSAGE" in dialog_source
+    assert "OPEN_HTML_LABEL" in dialog_source
+    assert "OPEN_FOLDER_LABEL" in dialog_source
 
 
 def test_gui_actions_prioritize_collection_and_html_result():

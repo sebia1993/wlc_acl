@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Collect Aruba AOS8 WLC SSID, role, and ACL mappings and generate Excel/HTML reports."
 requires-python = ">=3.11"
 dependencies = [
+  "customtkinter>=5.2",
   "netmiko>=4.0",
   "openpyxl>=3.1",
   "paramiko>=2.9.5",

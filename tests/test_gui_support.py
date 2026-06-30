@@ -1,7 +1,13 @@
+import customtkinter as ctk
+
 from wlc_role_acl_collector.gui_app import (
     ADVANCED_OPTIONS_HIDE_LABEL,
     ADVANCED_OPTIONS_SHOW_LABEL,
+    APP_TITLE,
     COLLECTION_ACTION_LABEL,
+    CUSTOMTKINTER_APPEARANCE_MODE,
+    CUSTOMTKINTER_COLOR_THEME,
+    DEFAULT_WINDOW_SIZE,
     DIAGNOSTIC_ACTION_LABEL,
     LOG_HIDE_LABEL,
     LOG_SHOW_LABEL,
@@ -21,6 +27,7 @@ from wlc_role_acl_collector.gui_app import (
     _role_networks_status_message,
     STAGE_LABELS,
     STAGE_PROGRESS,
+    WlcRoleAclCollectorGui,
     WLC_IP_LABEL,
     WLC_TARGET_NOTICE,
     _collection_failure_message,
@@ -45,6 +52,14 @@ def test_gui_app_importable():
     import wlc_role_acl_collector.gui_app as gui_app
 
     assert callable(gui_app.main)
+
+
+def test_gui_uses_customtkinter_dark_blue_app_shell():
+    assert issubclass(WlcRoleAclCollectorGui, ctk.CTk)
+    assert APP_TITLE == "Aruba WLC Ops Analyzer v2.0"
+    assert DEFAULT_WINDOW_SIZE == (1100, 750)
+    assert CUSTOMTKINTER_APPEARANCE_MODE == "Dark"
+    assert CUSTOMTKINTER_COLOR_THEME == "blue"
 
 
 def test_gui_notice_tells_user_to_connect_to_wlc_not_mm():
@@ -236,7 +251,7 @@ def test_format_collection_progress_for_role_command():
 
 def test_constrain_window_rect_keeps_window_inside_monitor_work_area():
     assert _constrain_window_rect(900, 650, 1200, 900, (0, 0, 1000, 700)) == (0, 0, 1000, 700)
-    assert _constrain_window_rect(800, 650, 760, 560, (100, 100, 900, 700)) == (140, 140, 760, 560)
+    assert _constrain_window_rect(800, 650, 760, 560, (100, 100, 900, 700)) == (100, 140, 800, 560)
 
 
 def test_collection_failure_message_includes_failed_command_and_run_log(tmp_path):

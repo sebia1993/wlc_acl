@@ -14,7 +14,9 @@ import sys
 import threading
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox
+
+import customtkinter as ctk
 
 from .collector import collect_from_controller
 from .diagnostic_mode import run_diagnostic
@@ -25,33 +27,41 @@ from .report import build_parsed_controllers, timestamp_slug, write_raw_result, 
 from .role_networks import RoleNetworkDefinitionError, RoleNetworkLoadSummary, load_role_network_definitions_with_summary
 
 
-DEFAULT_WINDOW_SIZE = (1080, 720)
-MIN_WINDOW_SIZE = (760, 520)
+APP_TITLE = "Aruba WLC Ops Analyzer v2.0"
+CUSTOMTKINTER_APPEARANCE_MODE = "Dark"
+CUSTOMTKINTER_COLOR_THEME = "blue"
+DEFAULT_WINDOW_SIZE = (1100, 750)
+MIN_WINDOW_SIZE = (820, 560)
 WINDOW_MARGIN = 48
-APP_BG = "#edf2f7"
-PANEL_BG = "#ffffff"
-PANEL_SUBTLE_BG = "#f8fafc"
-LINE_COLOR = "#d5dde8"
-LINE_STRONG_COLOR = "#b8c4d4"
-TEXT_COLOR = "#172033"
-MUTED_COLOR = "#667085"
-ACCENT_COLOR = "#155eef"
-ACCENT_ACTIVE_COLOR = "#0f4fd3"
-ACCENT_DARK_COLOR = "#123c69"
-ACCENT_SOFT_BG = "#eaf3ff"
-SUCCESS_COLOR = "#067647"
-SUCCESS_SOFT_BG = "#ecfdf3"
-WARNING_COLOR = "#b54708"
-WARNING_SOFT_BG = "#fffaeb"
-DANGER_COLOR = "#b42318"
-DANGER_SOFT_BG = "#fef3f2"
-LOG_BG = "#0f172a"
+APP_BG = "#0b1120"
+PANEL_BG = "#111827"
+PANEL_SUBTLE_BG = "#172033"
+CONTROL_BG = "#1f2937"
+CONTROL_HOVER_BG = "#263244"
+LINE_COLOR = "#2b3648"
+LINE_STRONG_COLOR = "#3c4a60"
+TEXT_COLOR = "#e5e7eb"
+MUTED_COLOR = "#9ca3af"
+ACCENT_COLOR = "#2563eb"
+ACCENT_ACTIVE_COLOR = "#1d4ed8"
+ACCENT_DARK_COLOR = "#bfdbfe"
+ACCENT_SOFT_BG = "#1e3a8a"
+SUCCESS_COLOR = "#86efac"
+SUCCESS_SOFT_BG = "#14532d"
+WARNING_COLOR = "#fcd34d"
+WARNING_SOFT_BG = "#422006"
+DANGER_COLOR = "#fca5a5"
+DANGER_SOFT_BG = "#450a0a"
+LOG_BG = "#020617"
 LOG_TEXT = "#dbeafe"
 LOG_MUTED = "#94a3b8"
 LOG_INFO = "#93c5fd"
 LOG_SUCCESS = "#86efac"
 LOG_WARNING = "#fcd34d"
 LOG_ERROR = "#fca5a5"
+
+ctk.set_appearance_mode(CUSTOMTKINTER_APPEARANCE_MODE)
+ctk.set_default_color_theme(CUSTOMTKINTER_COLOR_THEME)
 WLC_IP_LABEL = "WLC IP"
 REPORT_NAME_LABEL = "보고서 이름(선택)"
 WLC_TARGET_NOTICE = "Mobility Master(MM)가 아니라 실제 WLC 컨트롤러 IP를 입력하세요."
@@ -190,12 +200,12 @@ def _constrain_window_rect(
     return x, y, width, height
 
 
-class WlcRoleAclCollectorGui(tk.Tk):
+class WlcRoleAclCollectorGui(ctk.CTk):
     def __init__(self) -> None:
         _enable_windows_dpi_awareness()
         super().__init__()
-        self.title("WLC Role ACL Collector")
-        self.configure(bg=APP_BG)
+        self.title(APP_TITLE)
+        self.configure(fg_color=APP_BG)
         self.minsize(*MIN_WINDOW_SIZE)
 
         # Tkinter 화면은 메인 스레드에서만 안전하게 수정해야 합니다.
@@ -206,7 +216,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
         self.advanced_options_visible = False
         self.log_visible = False
         self._fit_after_id: str | None = None
-        self.stage_label_widgets: dict[str, tk.Label] = {}
+        self.stage_label_widgets: dict[str, ctk.CTkLabel] = {}
         self.last_run_dir: Path | None = None
         self.last_html: Path | None = None
         self.last_xlsx: Path | None = None
@@ -235,30 +245,8 @@ class WlcRoleAclCollectorGui(tk.Tk):
         self.after(150, self._drain_events)
 
     def _style(self) -> None:
-        style = ttk.Style(self)
-        style.theme_use("clam")
-        style.configure(
-            "Accent.TButton",
-            font=("Segoe UI Semibold", 10),
-            foreground="#ffffff",
-            background=ACCENT_COLOR,
-            borderwidth=0,
-            padding=(16, 10),
-        )
-        style.map("Accent.TButton", background=[("active", ACCENT_ACTIVE_COLOR), ("disabled", "#98a2b3")])
-        style.configure(
-            "Soft.TButton",
-            font=("Segoe UI", 10),
-            foreground=TEXT_COLOR,
-            background="#e9eef5",
-            borderwidth=0,
-            padding=(14, 9),
-        )
-        style.map("Soft.TButton", background=[("active", "#dfe7f1"), ("disabled", "#f3f4f6")])
-        style.configure("TLabel", background=PANEL_BG, foreground=TEXT_COLOR, font=("Segoe UI", 10))
-        style.configure("Muted.TLabel", background=PANEL_BG, foreground=MUTED_COLOR, font=("Segoe UI", 9))
-        style.configure("TEntry", padding=(9, 7), fieldbackground=PANEL_BG)
-        style.configure("TCombobox", padding=(9, 7), fieldbackground=PANEL_BG)
+        ctk.set_appearance_mode(CUSTOMTKINTER_APPEARANCE_MODE)
+        ctk.set_default_color_theme(CUSTOMTKINTER_COLOR_THEME)
 
     def _set_initial_window_bounds(self) -> None:
         work_area = _window_work_area(self.winfo_id())
@@ -308,45 +296,59 @@ class WlcRoleAclCollectorGui(tk.Tk):
             self.geometry(f"{width}x{height}+{x}+{y}")
 
     def _layout(self) -> None:
-        root = tk.Frame(self, bg=APP_BG, padx=16, pady=16)
-        root.pack(fill="both", expand=True)
+        root = ctk.CTkFrame(self, fg_color=APP_BG, corner_radius=0)
+        root.pack(fill="both", expand=True, padx=18, pady=18)
         root.grid_columnconfigure(0, weight=1)
         root.grid_rowconfigure(1, weight=1)
 
-        header = tk.Frame(root, bg=PANEL_BG, padx=18, pady=15, highlightbackground=LINE_COLOR, highlightthickness=1)
+        header = ctk.CTkFrame(
+            root,
+            fg_color=PANEL_BG,
+            border_width=1,
+            border_color=LINE_COLOR,
+            corner_radius=8,
+        )
         header.grid(row=0, column=0, sticky="ew")
         header.grid_columnconfigure(0, weight=1)
         header.grid_columnconfigure(1, weight=0)
-        tk.Label(
+        ctk.CTkLabel(
             header,
-            text="WLC Role ACL Collector",
-            bg=PANEL_BG,
-            fg=TEXT_COLOR,
+            text="Aruba WLC Ops Analyzer",
+            text_color=TEXT_COLOR,
             font=("Segoe UI Semibold", 19),
-        ).grid(row=0, column=0, sticky="w")
-        tk.Label(
+            anchor="w",
+        ).grid(row=0, column=0, sticky="w", padx=18, pady=(16, 0))
+        ctk.CTkLabel(
             header,
             text="접속 정보 입력, 수집 시작, 결과 확인 순서로 WLC Role ACL 보고서를 생성합니다.",
-            bg=PANEL_BG,
-            fg=MUTED_COLOR,
+            text_color=MUTED_COLOR,
             font=("Segoe UI", 10),
-        ).grid(row=1, column=0, sticky="w", pady=(4, 0))
-        badge_row = tk.Frame(header, bg=PANEL_BG)
-        badge_row.grid(row=0, column=1, rowspan=2, sticky="e")
+            anchor="w",
+        ).grid(row=1, column=0, sticky="w", padx=18, pady=(4, 16))
+        badge_row = ctk.CTkFrame(header, fg_color="transparent")
+        badge_row.grid(row=0, column=1, rowspan=2, sticky="e", padx=18)
         self._pill(badge_row, "보안 모드", ACCENT_SOFT_BG, ACCENT_DARK_COLOR).pack(side="left", padx=(0, 7))
         self._pill(badge_row, "읽기 전용", SUCCESS_SOFT_BG, SUCCESS_COLOR).pack(side="left", padx=(0, 7))
         self._pill(badge_row, "AOS8 WLC", PANEL_SUBTLE_BG, TEXT_COLOR).pack(side="left")
 
-        body = tk.Frame(root, bg=APP_BG)
+        body = ctk.CTkFrame(root, fg_color=APP_BG, corner_radius=0)
         body.grid(row=1, column=0, sticky="nsew", pady=(14, 0))
-        body.grid_columnconfigure(0, weight=0, minsize=336)
+        body.grid_columnconfigure(0, weight=0, minsize=360)
         body.grid_columnconfigure(1, weight=1)
         body.grid_rowconfigure(0, weight=1)
 
-        left = tk.Frame(body, bg=PANEL_BG, highlightbackground=LINE_COLOR, highlightthickness=1)
+        left = ctk.CTkFrame(
+            body,
+            fg_color=PANEL_BG,
+            border_width=1,
+            border_color=LINE_COLOR,
+            corner_radius=8,
+            width=360,
+        )
         left.grid(row=0, column=0, sticky="ns")
         left.grid_rowconfigure(0, weight=1)
         left.grid_columnconfigure(0, weight=1)
+        left.grid_propagate(False)
 
         form = self._scrollable_form(left)
 
@@ -362,85 +364,130 @@ class WlcRoleAclCollectorGui(tk.Tk):
         self._entry(form, "Enable password", self.enable_password_var, show="*")
 
         self._section_label(form, "3. 결과 저장")
-        output_row = tk.Frame(form, bg=PANEL_BG)
+        output_row = ctk.CTkFrame(form, fg_color="transparent")
         output_row.pack(fill="x", pady=(4, 8))
-        ttk.Entry(output_row, textvariable=self.output_dir_var, width=34).pack(side="left", fill="x", expand=True)
-        ttk.Button(output_row, text="폴더 선택", style="Soft.TButton", command=self._browse_output).pack(
-            side="left", padx=(8, 0)
+        ctk.CTkEntry(output_row, textvariable=self.output_dir_var, height=34, corner_radius=6).pack(
+            side="left", fill="x", expand=True
         )
-        self.advanced_toggle_button = ttk.Button(
-            form,
-            text=ADVANCED_OPTIONS_SHOW_LABEL,
-            style="Soft.TButton",
-            command=self._toggle_advanced_options,
-        )
+        self._button(output_row, text="폴더 선택", command=self._browse_output).pack(side="left", padx=(8, 0))
+        self.advanced_toggle_button = self._button(form, text=ADVANCED_OPTIONS_SHOW_LABEL, command=self._toggle_advanced_options)
         self.advanced_toggle_button.pack(fill="x", pady=(10, 0))
-        self.advanced_options_container = tk.Frame(form, bg=PANEL_BG)
+        self.advanced_options_container = ctk.CTkFrame(form, fg_color="transparent")
         self._section_label(self.advanced_options_container, "고급 옵션")
         self._role_networks_row(self.advanced_options_container)
         self._timeout_row(self.advanced_options_container)
         self._section_label(self.advanced_options_container, "문제 해결")
-        ttk.Label(
+        ctk.CTkLabel(
             self.advanced_options_container,
             text="원본 장비 출력 없이 접속/명령 단계와 오류 코드만 확인할 때 사용합니다.",
-            style="Muted.TLabel",
+            text_color=MUTED_COLOR,
+            font=("Segoe UI", 9),
             wraplength=295,
+            anchor="w",
+            justify="left",
         ).pack(anchor="w", pady=(0, 7))
-        self.diagnostic_button = ttk.Button(
+        self.diagnostic_button = self._button(
             self.advanced_options_container,
             text=DIAGNOSTIC_ACTION_LABEL,
-            style="Soft.TButton",
             command=self._start_diagnostic,
         )
         self.diagnostic_button.pack(fill="x", pady=(0, 8))
 
-        right = tk.Frame(body, bg=APP_BG)
+        right = ctk.CTkFrame(body, fg_color=APP_BG, corner_radius=0)
         right.grid(row=0, column=1, sticky="nsew", padx=(14, 0))
         right.grid_columnconfigure(0, weight=1)
         right.grid_rowconfigure(1, weight=1)
 
-        status_panel = tk.Frame(right, bg=PANEL_BG, padx=16, pady=14, highlightbackground=LINE_COLOR, highlightthickness=1)
+        status_panel = ctk.CTkFrame(
+            right,
+            fg_color=PANEL_BG,
+            border_width=1,
+            border_color=LINE_COLOR,
+            corner_radius=8,
+        )
         status_panel.grid(row=0, column=0, sticky="ew")
         self._status_panel(status_panel)
         self._action_panel(status_panel)
 
-        self.log_panel = tk.Frame(right, bg=PANEL_BG, padx=12, pady=12, highlightbackground=LINE_COLOR, highlightthickness=1)
+        self.log_panel = ctk.CTkFrame(
+            right,
+            fg_color=PANEL_BG,
+            border_width=1,
+            border_color=LINE_COLOR,
+            corner_radius=8,
+        )
         self.log_panel.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
         self.log_panel.grid_columnconfigure(0, weight=1)
         self.log_panel.grid_rowconfigure(1, weight=1)
-        top = tk.Frame(self.log_panel, bg=PANEL_BG)
-        top.grid(row=0, column=0, sticky="ew")
-        tk.Label(top, text="수집 로그", bg=PANEL_BG, fg=TEXT_COLOR, font=("Segoe UI Semibold", 12)).pack(side="left")
-        tk.Label(top, text="명령 실행 기록", bg=PANEL_BG, fg=MUTED_COLOR, font=("Segoe UI", 9)).pack(
+        top = ctk.CTkFrame(self.log_panel, fg_color="transparent")
+        top.grid(row=0, column=0, sticky="ew", padx=14, pady=(14, 0))
+        ctk.CTkLabel(top, text="수집 로그", text_color=TEXT_COLOR, font=("Segoe UI Semibold", 12)).pack(side="left")
+        ctk.CTkLabel(top, text="명령 실행 기록", text_color=MUTED_COLOR, font=("Segoe UI", 9)).pack(
             side="left", padx=(8, 0)
         )
-        ttk.Button(top, text="지우기", style="Soft.TButton", command=self._clear_log).pack(side="right")
-        self.log_text = tk.Text(
+        self._button(top, text="지우기", command=self._clear_log).pack(side="right")
+        self.log_text = ctk.CTkTextbox(
             self.log_panel,
             height=20,
             wrap="word",
-            bg=LOG_BG,
-            fg=LOG_TEXT,
-            insertbackground=PANEL_BG,
-            relief="flat",
-            padx=10,
-            pady=10,
+            fg_color=LOG_BG,
+            text_color=LOG_TEXT,
+            border_width=1,
+            border_color=LINE_COLOR,
+            corner_radius=8,
+            font=("Consolas", 10),
         )
-        self.log_text.grid(row=1, column=0, sticky="nsew", pady=(10, 0))
+        self.log_text.grid(row=1, column=0, sticky="nsew", padx=14, pady=(10, 14))
         self._configure_log_tags()
         self.log_text.configure(state="disabled")
         self._sync_advanced_options()
         self._sync_log_panel()
 
-    def _pill(self, parent: tk.Widget, text: str, bg: str, fg: str) -> tk.Label:
-        return tk.Label(
+    def _pill(self, parent: tk.Widget, text: str, bg: str, fg: str) -> ctk.CTkLabel:
+        return ctk.CTkLabel(
             parent,
             text=text,
-            bg=bg,
-            fg=fg,
+            fg_color=bg,
+            text_color=fg,
             font=("Segoe UI Semibold", 9),
-            padx=10,
-            pady=5,
+            height=34,
+            corner_radius=6,
+        )
+
+    def _button(
+        self,
+        parent: tk.Widget,
+        *,
+        text: str,
+        command=None,
+        variant: str = "secondary",
+        state: str = "normal",
+    ) -> ctk.CTkButton:
+        if variant == "primary":
+            return ctk.CTkButton(
+                parent,
+                text=text,
+                command=command,
+                state=state,
+                height=38,
+                corner_radius=6,
+                fg_color=ACCENT_COLOR,
+                hover_color=ACCENT_ACTIVE_COLOR,
+                text_color="#ffffff",
+                font=("Segoe UI Semibold", 10),
+            )
+        return ctk.CTkButton(
+            parent,
+            text=text,
+            command=command,
+            state=state,
+            height=36,
+            corner_radius=6,
+            fg_color=CONTROL_BG,
+            hover_color=CONTROL_HOVER_BG,
+            text_color=TEXT_COLOR,
+            text_color_disabled="#6b7280",
+            font=("Segoe UI", 10),
         )
 
     def _toggle_advanced_options(self) -> None:
@@ -468,208 +515,269 @@ class WlcRoleAclCollectorGui(tk.Tk):
             self.log_toggle_button.configure(text=LOG_SHOW_LABEL)
 
     def _status_panel(self, parent: tk.Widget) -> None:
-        header = tk.Frame(parent, bg=PANEL_BG)
-        header.pack(fill="x")
-        tk.Label(header, text="수집 상태", bg=PANEL_BG, fg=TEXT_COLOR, font=("Segoe UI Semibold", 12)).pack(
+        header = ctk.CTkFrame(parent, fg_color="transparent")
+        header.pack(fill="x", padx=16, pady=(14, 0))
+        ctk.CTkLabel(header, text="수집 상태", text_color=TEXT_COLOR, font=("Segoe UI Semibold", 12)).pack(
             side="left"
         )
-        tk.Label(
+        ctk.CTkLabel(
             header,
             textvariable=self.stage_var,
-            bg=ACCENT_SOFT_BG,
-            fg=ACCENT_DARK_COLOR,
+            fg_color=ACCENT_SOFT_BG,
+            text_color=ACCENT_DARK_COLOR,
             font=("Segoe UI Semibold", 9),
-            padx=10,
-            pady=5,
+            height=32,
+            corner_radius=6,
         ).pack(side="right")
 
-        tk.Label(
+        ctk.CTkLabel(
             parent,
             textvariable=self.status_var,
-            bg=PANEL_BG,
-            fg=TEXT_COLOR,
+            text_color=TEXT_COLOR,
             font=("Segoe UI Semibold", 11),
-        ).pack(anchor="w", pady=(9, 0))
+            anchor="w",
+            justify="left",
+        ).pack(anchor="w", fill="x", padx=16, pady=(9, 0))
 
-        stage_row = tk.Frame(parent, bg=PANEL_BG)
-        stage_row.pack(fill="x", pady=(12, 0))
+        stage_row = ctk.CTkFrame(parent, fg_color="transparent")
+        stage_row.pack(fill="x", padx=16, pady=(12, 0))
         for index, stage in enumerate(STAGE_SEQUENCE):
             stage_row.grid_columnconfigure(index, weight=1, uniform="stage")
-            label = tk.Label(
+            label = ctk.CTkLabel(
                 stage_row,
                 text=STAGE_LABELS[stage],
-                bg=PANEL_SUBTLE_BG,
-                fg=MUTED_COLOR,
+                fg_color=PANEL_SUBTLE_BG,
+                text_color=MUTED_COLOR,
                 font=("Segoe UI Semibold", 8),
-                padx=7,
-                pady=6,
-                highlightbackground=LINE_COLOR,
-                highlightthickness=1,
+                height=34,
+                corner_radius=6,
             )
             label.grid(row=0, column=index, sticky="ew", padx=(0 if index == 0 else 5, 0))
             self.stage_label_widgets[stage] = label
         self._set_stage("ready")
 
-        self.progress = ttk.Progressbar(parent, mode="determinate", maximum=100)
-        self.progress.pack(fill="x", pady=(12, 0))
+        self.progress = ctk.CTkProgressBar(
+            parent,
+            height=12,
+            corner_radius=6,
+            fg_color=CONTROL_BG,
+            progress_color=ACCENT_COLOR,
+            mode="determinate",
+        )
+        self.progress.pack(fill="x", padx=16, pady=(12, 0))
+        self.progress.set(0)
 
-        self.log_toggle_button = ttk.Button(
+        self.log_toggle_button = self._button(
             parent,
             text=LOG_SHOW_LABEL,
-            style="Soft.TButton",
             command=self._toggle_log_panel,
         )
-        self.log_toggle_button.pack(anchor="w", pady=(10, 0))
+        self.log_toggle_button.pack(anchor="w", padx=16, pady=(10, 0))
 
     def _action_panel(self, parent: tk.Widget) -> None:
-        tk.Label(parent, text="수집 실행", bg=PANEL_BG, fg=MUTED_COLOR, font=("Segoe UI Semibold", 9)).pack(
-            anchor="w", pady=(13, 0)
+        ctk.CTkLabel(parent, text="수집 실행", text_color=MUTED_COLOR, font=("Segoe UI Semibold", 9)).pack(
+            anchor="w", padx=16, pady=(13, 0)
         )
-        actions = tk.Frame(parent, bg=PANEL_BG)
-        actions.pack(fill="x", pady=(12, 0))
+        actions = ctk.CTkFrame(parent, fg_color="transparent")
+        actions.pack(fill="x", padx=16, pady=(12, 0))
         actions.grid_columnconfigure(0, weight=1)
 
-        self.start_button = ttk.Button(
+        self.start_button = self._button(
             actions,
             text=COLLECTION_ACTION_LABEL,
-            style="Accent.TButton",
+            variant="primary",
             command=self._start_collection,
         )
         self.start_button.grid(row=0, column=0, sticky="ew")
 
-        tk.Label(parent, text="결과 확인", bg=PANEL_BG, fg=MUTED_COLOR, font=("Segoe UI Semibold", 9)).pack(
-            anchor="w", pady=(13, 0)
+        ctk.CTkLabel(parent, text="결과 확인", text_color=MUTED_COLOR, font=("Segoe UI Semibold", 9)).pack(
+            anchor="w", padx=16, pady=(13, 0)
         )
 
-        outputs = tk.Frame(parent, bg=PANEL_BG)
-        outputs.pack(fill="x", pady=(9, 0))
+        outputs = ctk.CTkFrame(parent, fg_color="transparent")
+        outputs.pack(fill="x", padx=16, pady=(9, 16))
         outputs.grid_columnconfigure(0, weight=1, uniform="result_actions")
         outputs.grid_columnconfigure(1, weight=1, uniform="result_actions")
 
-        self.open_html_button = ttk.Button(
-            outputs, text=OPEN_HTML_LABEL, style="Accent.TButton", command=self._open_html, state="disabled"
+        self.open_html_button = self._button(
+            outputs, text=OPEN_HTML_LABEL, variant="primary", command=self._open_html, state="disabled"
         )
         self.open_html_button.grid(row=0, column=0, columnspan=2, sticky="ew")
-        self.open_xlsx_button = ttk.Button(
-            outputs, text=OPEN_XLSX_LABEL, style="Soft.TButton", command=self._open_xlsx, state="disabled"
+        self.open_xlsx_button = self._button(
+            outputs, text=OPEN_XLSX_LABEL, command=self._open_xlsx, state="disabled"
         )
         self.open_xlsx_button.grid(row=1, column=0, sticky="ew", padx=(0, 6), pady=(8, 0))
-        self.open_folder_button = ttk.Button(
-            outputs, text=OPEN_FOLDER_LABEL, style="Soft.TButton", command=self._open_output_folder, state="disabled"
+        self.open_folder_button = self._button(
+            outputs, text=OPEN_FOLDER_LABEL, command=self._open_output_folder, state="disabled"
         )
         self.open_folder_button.grid(row=1, column=1, sticky="ew", padx=(6, 0), pady=(8, 0))
 
-    def _scrollable_form(self, parent: tk.Widget) -> tk.Frame:
-        canvas = tk.Canvas(parent, bg=PANEL_BG, highlightthickness=0, width=336)
-        scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
-        canvas.configure(yscrollcommand=scrollbar.set)
-        canvas.grid(row=0, column=0, sticky="nsew")
-        scrollbar.grid(row=0, column=1, sticky="ns")
-
-        form = tk.Frame(canvas, bg=PANEL_BG, padx=18, pady=16)
-        form_window = canvas.create_window((0, 0), window=form, anchor="nw")
-
-        def resize_scroll_region(_event: tk.Event) -> None:
-            canvas.configure(scrollregion=canvas.bbox("all"))
-
-        def resize_form(event: tk.Event) -> None:
-            canvas.itemconfigure(form_window, width=event.width)
-
-        form.bind("<Configure>", resize_scroll_region)
-        canvas.bind("<Configure>", resize_form)
-        canvas.bind("<MouseWheel>", lambda event: canvas.yview_scroll(int(-1 * (event.delta / 120)), "units"))
-        form.bind("<MouseWheel>", lambda event: canvas.yview_scroll(int(-1 * (event.delta / 120)), "units"))
+    def _scrollable_form(self, parent: tk.Widget) -> ctk.CTkScrollableFrame:
+        form = ctk.CTkScrollableFrame(
+            parent,
+            fg_color=PANEL_BG,
+            scrollbar_button_color=CONTROL_BG,
+            scrollbar_button_hover_color=CONTROL_HOVER_BG,
+            corner_radius=0,
+            width=338,
+        )
+        form.grid(row=0, column=0, sticky="nsew", padx=14, pady=14)
+        form.grid_columnconfigure(0, weight=1)
         return form
 
     def _section_label(self, parent: tk.Widget, text: str) -> None:
-        container = tk.Frame(parent, bg=PANEL_BG)
+        container = ctk.CTkFrame(parent, fg_color="transparent")
         container.pack(fill="x", pady=(10, 8))
-        tk.Label(
+        ctk.CTkLabel(
             container,
             text=text.upper(),
-            bg=PANEL_BG,
-            fg=ACCENT_DARK_COLOR,
+            text_color=ACCENT_DARK_COLOR,
             font=("Segoe UI Semibold", 9),
         ).pack(side="left")
-        tk.Frame(container, bg=LINE_COLOR, height=1).pack(side="left", fill="x", expand=True, padx=(8, 0), pady=(8, 0))
+        ctk.CTkFrame(container, fg_color=LINE_COLOR, height=1, corner_radius=0).pack(
+            side="left", fill="x", expand=True, padx=(8, 0), pady=(8, 0)
+        )
 
     def _notice(self, parent: tk.Widget, text: str) -> None:
-        frame = tk.Frame(parent, bg=WARNING_SOFT_BG, highlightbackground="#fedf89", highlightthickness=1)
+        frame = ctk.CTkFrame(
+            parent,
+            fg_color=WARNING_SOFT_BG,
+            border_width=1,
+            border_color="#92400e",
+            corner_radius=6,
+        )
         frame.pack(fill="x", pady=(0, 10))
-        tk.Label(
+        ctk.CTkLabel(
             frame,
             text=text,
-            bg=WARNING_SOFT_BG,
-            fg=WARNING_COLOR,
+            text_color=WARNING_COLOR,
             font=("Segoe UI Semibold", 9),
             justify="left",
             wraplength=280,
-            padx=10,
-            pady=8,
-        ).pack(anchor="w", fill="x")
+            anchor="w",
+        ).pack(anchor="w", fill="x", padx=10, pady=8)
 
     def _entry(self, parent: tk.Widget, label: str, variable: tk.StringVar, *, show: str = "", hint: str = "") -> None:
-        row = tk.Frame(parent, bg=PANEL_BG)
+        row = ctk.CTkFrame(parent, fg_color="transparent")
         row.pack(fill="x", pady=(0, 8))
-        tk.Label(row, text=label, bg=PANEL_BG, fg="#344054", font=("Segoe UI", 9)).pack(anchor="w")
-        ttk.Entry(row, textvariable=variable, show=show, width=42).pack(fill="x", pady=(3, 0))
+        ctk.CTkLabel(row, text=label, text_color=TEXT_COLOR, font=("Segoe UI", 9)).pack(anchor="w")
+        ctk.CTkEntry(
+            row,
+            textvariable=variable,
+            show=show,
+            height=34,
+            corner_radius=6,
+            fg_color=CONTROL_BG,
+            border_color=LINE_STRONG_COLOR,
+            text_color=TEXT_COLOR,
+        ).pack(fill="x", pady=(3, 0))
         if hint:
-            ttk.Label(row, text=hint, style="Muted.TLabel", wraplength=295).pack(anchor="w", pady=(3, 0))
+            ctk.CTkLabel(
+                row,
+                text=hint,
+                text_color=MUTED_COLOR,
+                font=("Segoe UI", 9),
+                wraplength=295,
+                anchor="w",
+                justify="left",
+            ).pack(anchor="w", pady=(3, 0))
 
     def _protocol_row(self, parent: tk.Widget) -> None:
-        row = tk.Frame(parent, bg=PANEL_BG)
+        row = ctk.CTkFrame(parent, fg_color="transparent")
         row.pack(fill="x", pady=(0, 8))
-        left = tk.Frame(row, bg=PANEL_BG)
+        left = ctk.CTkFrame(row, fg_color="transparent")
         left.pack(side="left", fill="x", expand=True)
-        right = tk.Frame(row, bg=PANEL_BG)
+        right = ctk.CTkFrame(row, fg_color="transparent")
         right.pack(side="left", fill="x", expand=True, padx=(8, 0))
-        tk.Label(left, text="Protocol", bg=PANEL_BG, fg="#344054", font=("Segoe UI", 9)).pack(anchor="w")
-        protocol = ttk.Combobox(left, textvariable=self.protocol_var, values=("ssh", "telnet"), state="readonly", width=16)
+        ctk.CTkLabel(left, text="Protocol", text_color=TEXT_COLOR, font=("Segoe UI", 9)).pack(anchor="w")
+        protocol = ctk.CTkComboBox(
+            left,
+            variable=self.protocol_var,
+            values=["ssh", "telnet"],
+            state="readonly",
+            height=34,
+            corner_radius=6,
+            fg_color=CONTROL_BG,
+            border_color=LINE_STRONG_COLOR,
+            button_color=ACCENT_COLOR,
+            button_hover_color=ACCENT_ACTIVE_COLOR,
+            dropdown_fg_color=PANEL_BG,
+            dropdown_hover_color=CONTROL_HOVER_BG,
+            dropdown_text_color=TEXT_COLOR,
+            text_color=TEXT_COLOR,
+        )
         protocol.pack(fill="x", pady=(3, 0))
-        tk.Label(right, text="Port", bg=PANEL_BG, fg="#344054", font=("Segoe UI", 9)).pack(anchor="w")
-        ttk.Entry(right, textvariable=self.port_var, width=16).pack(fill="x", pady=(3, 0))
+        ctk.CTkLabel(right, text="Port", text_color=TEXT_COLOR, font=("Segoe UI", 9)).pack(anchor="w")
+        ctk.CTkEntry(
+            right,
+            textvariable=self.port_var,
+            height=34,
+            corner_radius=6,
+            fg_color=CONTROL_BG,
+            border_color=LINE_STRONG_COLOR,
+            text_color=TEXT_COLOR,
+        ).pack(fill="x", pady=(3, 0))
 
     def _timeout_row(self, parent: tk.Widget) -> None:
-        row = tk.Frame(parent, bg=PANEL_BG)
+        row = ctk.CTkFrame(parent, fg_color="transparent")
         row.pack(fill="x", pady=(0, 8))
-        tk.Label(row, text="Timeout seconds", bg=PANEL_BG, fg="#344054", font=("Segoe UI", 9)).pack(anchor="w")
-        ttk.Spinbox(row, from_=5, to=600, textvariable=self.timeout_var, width=12).pack(anchor="w", pady=(3, 0))
+        ctk.CTkLabel(row, text="Timeout seconds", text_color=TEXT_COLOR, font=("Segoe UI", 9)).pack(anchor="w")
+        ctk.CTkEntry(
+            row,
+            textvariable=self.timeout_var,
+            width=120,
+            height=34,
+            corner_radius=6,
+            fg_color=CONTROL_BG,
+            border_color=LINE_STRONG_COLOR,
+            text_color=TEXT_COLOR,
+        ).pack(anchor="w", pady=(3, 0))
 
     def _role_networks_row(self, parent: tk.Widget) -> None:
-        row = tk.Frame(parent, bg=PANEL_BG)
+        row = ctk.CTkFrame(parent, fg_color="transparent")
         row.pack(fill="x", pady=(0, 8))
-        tk.Label(row, text=ROLE_NETWORK_LABEL, bg=PANEL_BG, fg="#344054", font=("Segoe UI", 9)).pack(anchor="w")
-        input_row = tk.Frame(row, bg=PANEL_BG)
+        ctk.CTkLabel(row, text=ROLE_NETWORK_LABEL, text_color=TEXT_COLOR, font=("Segoe UI", 9)).pack(anchor="w")
+        input_row = ctk.CTkFrame(row, fg_color="transparent")
         input_row.pack(fill="x", pady=(3, 0))
-        ttk.Entry(input_row, textvariable=self.role_networks_path_var, width=34).pack(side="left", fill="x", expand=True)
-        ttk.Button(input_row, text=ROLE_NETWORK_SELECT_LABEL, style="Soft.TButton", command=self._browse_role_networks).pack(
-            side="left", padx=(8, 0)
-        )
-        help_row = tk.Frame(row, bg=PANEL_BG)
+        ctk.CTkEntry(
+            input_row,
+            textvariable=self.role_networks_path_var,
+            height=34,
+            corner_radius=6,
+            fg_color=CONTROL_BG,
+            border_color=LINE_STRONG_COLOR,
+            text_color=TEXT_COLOR,
+        ).pack(side="left", fill="x", expand=True)
+        self._button(input_row, text=ROLE_NETWORK_SELECT_LABEL, command=self._browse_role_networks).pack(side="left", padx=(8, 0))
+        help_row = ctk.CTkFrame(row, fg_color="transparent")
         help_row.pack(fill="x", pady=(6, 0))
-        ttk.Button(
+        self._button(
             help_row,
             text=ROLE_NETWORK_GUIDE_LABEL,
-            style="Soft.TButton",
             command=self._show_role_network_guide,
         ).pack(side="left", fill="x", expand=True, padx=(0, 4))
-        ttk.Button(
+        self._button(
             help_row,
             text=ROLE_NETWORK_TEMPLATE_LABEL,
-            style="Soft.TButton",
             command=self._open_role_network_template,
         ).pack(side="left", fill="x", expand=True, padx=(4, 0))
-        ttk.Label(
+        ctk.CTkLabel(
             row,
             text=ROLE_NETWORK_HELP,
-            style="Muted.TLabel",
+            text_color=MUTED_COLOR,
+            font=("Segoe UI", 9),
             wraplength=295,
+            anchor="w",
+            justify="left",
         ).pack(anchor="w", pady=(3, 0))
-        ttk.Label(
+        ctk.CTkLabel(
             row,
             textvariable=self.role_networks_status_var,
-            style="Muted.TLabel",
+            text_color=MUTED_COLOR,
+            font=("Segoe UI", 9),
             wraplength=295,
+            anchor="w",
+            justify="left",
         ).pack(anchor="w", pady=(3, 0))
 
     def _on_protocol_changed(self, *_args: object) -> None:
@@ -699,61 +807,59 @@ class WlcRoleAclCollectorGui(tk.Tk):
                 messagebox.showerror("Role 대역표 오류", str(exc))
 
     def _show_role_network_guide(self) -> None:
-        window = tk.Toplevel(self)
+        window = ctk.CTkToplevel(self)
         window.title(ROLE_NETWORK_GUIDE_TITLE)
-        window.configure(bg=APP_BG)
+        window.configure(fg_color=APP_BG)
         window.transient(self)
         window.minsize(560, 480)
 
-        container = tk.Frame(window, bg=PANEL_BG, padx=16, pady=16)
+        container = ctk.CTkFrame(
+            window,
+            fg_color=PANEL_BG,
+            border_width=1,
+            border_color=LINE_COLOR,
+            corner_radius=8,
+        )
         container.pack(fill="both", expand=True, padx=14, pady=14)
-        tk.Label(
+        ctk.CTkLabel(
             container,
             text=ROLE_NETWORK_GUIDE_TITLE,
-            bg=PANEL_BG,
-            fg=TEXT_COLOR,
+            text_color=TEXT_COLOR,
             font=("Segoe UI Semibold", 16),
-        ).pack(anchor="w")
-        tk.Label(
+        ).pack(anchor="w", padx=16, pady=(16, 0))
+        ctk.CTkLabel(
             container,
             text="샘플 Excel의 Role_Networks Sheet에 사내 기준 대역을 입력하세요. 해당 Sheet가 없으면 첫 번째 Sheet를 읽습니다.",
-            bg=PANEL_BG,
-            fg=MUTED_COLOR,
+            text_color=MUTED_COLOR,
             font=("Segoe UI", 9),
             wraplength=500,
             justify="left",
-        ).pack(anchor="w", pady=(3, 12))
+            anchor="w",
+        ).pack(anchor="w", fill="x", padx=16, pady=(3, 12))
 
-        text_frame = tk.Frame(container, bg=PANEL_BG)
-        text_frame.pack(fill="both", expand=True)
-        scrollbar = ttk.Scrollbar(text_frame, orient="vertical")
-        text = tk.Text(
-            text_frame,
+        text = ctk.CTkTextbox(
+            container,
             wrap="word",
-            bg="#ffffff",
-            fg=TEXT_COLOR,
-            relief="solid",
-            borderwidth=1,
-            padx=10,
-            pady=10,
+            fg_color=LOG_BG,
+            text_color=LOG_TEXT,
+            border_width=1,
+            border_color=LINE_COLOR,
+            corner_radius=8,
+            font=("Consolas", 10),
             height=18,
-            yscrollcommand=scrollbar.set,
         )
-        scrollbar.configure(command=text.yview)
-        text.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        text.pack(fill="both", expand=True, padx=16)
         text.insert("1.0", ROLE_NETWORK_GUIDE_TEXT)
         text.configure(state="disabled")
 
-        actions = tk.Frame(container, bg=PANEL_BG)
-        actions.pack(fill="x", pady=(12, 0))
-        ttk.Button(
+        actions = ctk.CTkFrame(container, fg_color="transparent")
+        actions.pack(fill="x", padx=16, pady=(12, 16))
+        self._button(
             actions,
             text=ROLE_NETWORK_TEMPLATE_LABEL,
-            style="Soft.TButton",
             command=self._open_role_network_template,
         ).pack(side="left")
-        ttk.Button(actions, text="닫기", style="Soft.TButton", command=window.destroy).pack(side="right")
+        self._button(actions, text="닫기", command=window.destroy).pack(side="right")
         window.focus_set()
 
     def _open_role_network_template(self) -> None:
@@ -780,28 +886,28 @@ class WlcRoleAclCollectorGui(tk.Tk):
         label = STAGE_LABELS.get(stage, STAGE_LABELS["ready"])
         self.stage_var.set(label)
         if hasattr(self, "progress"):
-            self.progress.configure(value=STAGE_PROGRESS.get(stage, 0))
+            self.progress.set(STAGE_PROGRESS.get(stage, 0) / 100)
         active_index = STAGE_SEQUENCE.index(stage) if stage in STAGE_SEQUENCE else -1
         for index, step in enumerate(STAGE_SEQUENCE):
             widget = self.stage_label_widgets.get(step)
             if widget is None:
                 continue
             if stage == "failed":
-                widget.configure(bg=PANEL_SUBTLE_BG, fg=MUTED_COLOR, highlightbackground=LINE_COLOR)
+                widget.configure(fg_color=PANEL_SUBTLE_BG, text_color=MUTED_COLOR)
             elif index < active_index:
-                widget.configure(bg=SUCCESS_SOFT_BG, fg=SUCCESS_COLOR, highlightbackground="#abefc6")
+                widget.configure(fg_color=SUCCESS_SOFT_BG, text_color=SUCCESS_COLOR)
             elif index == active_index:
-                widget.configure(bg=ACCENT_SOFT_BG, fg=ACCENT_DARK_COLOR, highlightbackground="#b9dcff")
+                widget.configure(fg_color=ACCENT_SOFT_BG, text_color=ACCENT_DARK_COLOR)
             else:
-                widget.configure(bg=PANEL_SUBTLE_BG, fg=MUTED_COLOR, highlightbackground=LINE_COLOR)
+                widget.configure(fg_color=PANEL_SUBTLE_BG, text_color=MUTED_COLOR)
 
     def _configure_log_tags(self) -> None:
-        self.log_text.tag_configure("normal", foreground=LOG_TEXT)
-        self.log_text.tag_configure("muted", foreground=LOG_MUTED)
-        self.log_text.tag_configure("info", foreground=LOG_INFO)
-        self.log_text.tag_configure("success", foreground=LOG_SUCCESS)
-        self.log_text.tag_configure("warning", foreground=LOG_WARNING)
-        self.log_text.tag_configure("error", foreground=LOG_ERROR)
+        self.log_text.tag_config("normal", foreground=LOG_TEXT)
+        self.log_text.tag_config("muted", foreground=LOG_MUTED)
+        self.log_text.tag_config("info", foreground=LOG_INFO)
+        self.log_text.tag_config("success", foreground=LOG_SUCCESS)
+        self.log_text.tag_config("warning", foreground=LOG_WARNING)
+        self.log_text.tag_config("error", foreground=LOG_ERROR)
 
     def _start_collection(self) -> None:
         if self.is_running:

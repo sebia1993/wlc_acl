@@ -16,11 +16,15 @@ def test_validate_script_runs_local_checks():
 
 def test_release_zip_includes_guides():
     script = Path(__file__).parents[1] / "build_windows_gui_exe.ps1"
+    spec = Path(__file__).parents[1] / "WlcRoleAclCollectorGUI.spec"
 
     text = script.read_text(encoding="utf-8")
+    spec_text = spec.read_text(encoding="utf-8")
 
     assert "WlcRoleAclCollectorGUI" in text
     assert "WlcRoleAclCollectorCLI" in text
+    assert "--collect-data customtkinter" in text
+    assert "collect_data_files('customtkinter')" in spec_text
     assert ".\\cli_launcher.py" in text
     assert "tools\\generate_doc_html.py" in text
     assert "docs\\USER_GUIDE_KO.md" in text
@@ -106,3 +110,9 @@ def test_github_actions_split_pr_validation_and_release():
     assert "--draft=false" in release_workflow
     assert "--cleanup-tag" in release_workflow
     assert 'git push origin ":refs/tags/$tag"' in release_workflow
+
+
+def test_runtime_dependencies_include_customtkinter():
+    pyproject = (Path(__file__).parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+
+    assert '"customtkinter>=5.2"' in pyproject

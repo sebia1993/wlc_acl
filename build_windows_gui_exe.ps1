@@ -108,6 +108,7 @@ Write-Host "Building Windows GUI executable..."
     --distpath $distDir `
     --workpath $buildDir `
     --specpath $specDir `
+    --collect-data customtkinter `
     --paths ".\src" `
     ".\gui_launcher.py"
 

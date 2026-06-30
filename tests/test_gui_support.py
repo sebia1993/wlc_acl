@@ -1,4 +1,5 @@
 import inspect
+from pathlib import Path
 
 import customtkinter as ctk
 
@@ -31,6 +32,10 @@ from wlc_role_acl_collector.gui_app import (
     REPORT_MANAGEMENT_MENU_LABEL,
     REPORT_COMPLETE_MESSAGE,
     REPORT_COMPLETE_TITLE,
+    RESULT_FOLDER_ACTION_LABEL,
+    RESULT_FOLDER_ACTION_TEXT,
+    RESULT_HTML_ACTION_TEXT,
+    RESULT_XLSX_ACTION_TEXT,
     ROLE_NETWORK_EMPTY_STATUS,
     ROLE_NETWORK_GUIDE_LABEL,
     ROLE_NETWORK_GUIDE_TEXT,
@@ -54,6 +59,7 @@ from wlc_role_acl_collector.gui_app import (
     _constrain_window_rect,
     _log_segments_for_line,
     _log_tag_for_line,
+    _result_report_summary_from_parsed,
     _write_run_log,
     format_collection_progress,
     format_diagnostic_progress,
@@ -64,8 +70,9 @@ from wlc_role_acl_collector.gui_support import (
     build_target_from_gui_input,
     default_gui_output_dir,
 )
-from wlc_role_acl_collector.models import CollectionResult, CommandOutput
-from wlc_role_acl_collector.report import write_raw_result
+from wlc_role_acl_collector.collector import collect_from_offline_raw
+from wlc_role_acl_collector.models import CollectionResult, CommandOutput, Controller, RoleNetworkDefinition
+from wlc_role_acl_collector.report import build_parsed_controllers, write_raw_result
 from wlc_role_acl_collector.role_networks import ROLE_NETWORKS_FALLBACK_NOTICE, RoleNetworkLoadSummary
 
 
@@ -165,8 +172,8 @@ def test_gui_uses_customtkinter_completion_dialog_instead_of_native_info_box():
     assert "self._show_report_complete_dialog(paths)" in drain_source
     assert "CTkToplevel" in dialog_source
     assert "REPORT_COMPLETE_MESSAGE" in dialog_source
-    assert "OPEN_HTML_LABEL" in dialog_source
-    assert "OPEN_FOLDER_LABEL" in dialog_source
+    assert "RESULT_HTML_ACTION_TEXT" in dialog_source
+    assert "RESULT_FOLDER_ACTION_TEXT" in dialog_source
 
 
 def test_gui_actions_prioritize_collection_and_html_result():
@@ -180,6 +187,32 @@ def test_gui_actions_prioritize_collection_and_html_result():
     assert OPEN_HTML_LABEL == "HTML 보고서 열기"
     assert OPEN_XLSX_LABEL == "Excel 열기"
     assert OPEN_FOLDER_LABEL == "결과 폴더 열기"
+    assert RESULT_FOLDER_ACTION_LABEL == "Excel 결과 폴더 열기"
+    assert RESULT_HTML_ACTION_TEXT == "[HTML] HTML 보고서 열기"
+    assert RESULT_FOLDER_ACTION_TEXT == "[DIR] Excel 결과 폴더 열기"
+    assert RESULT_XLSX_ACTION_TEXT == "[XLSX] Excel 열기"
+
+
+def test_report_tab_has_summary_cards_and_large_icon_actions():
+    report_source = inspect.getsource(WlcRoleAclCollectorGui._report_panel)
+    card_source = inspect.getsource(WlcRoleAclCollectorGui._result_summary_card)
+    action_source = inspect.getsource(WlcRoleAclCollectorGui._result_action_button)
+    worker_source = inspect.getsource(WlcRoleAclCollectorGui._run_collection_worker)
+    drain_source = inspect.getsource(WlcRoleAclCollectorGui._drain_events)
+
+    assert "결과 보고서 확인" in report_source
+    assert "self._result_summary_card" in report_source
+    assert "result_ssid_count_var" in report_source
+    assert "result_role_count_var" in report_source
+    assert "result_matched_count_var" in report_source
+    assert "result_mismatched_count_var" in report_source
+    assert "RESULT_HTML_ACTION_TEXT" in report_source
+    assert "RESULT_FOLDER_ACTION_TEXT" in report_source
+    assert "RESULT_XLSX_ACTION_TEXT" in report_source
+    assert "height=58" in action_source
+    assert "corner_radius=8" in card_source
+    assert '"summary": _result_report_summary_from_parsed(parsed, role_networks)' in worker_source
+    assert "self._set_result_summary(paths.get(\"summary\"))" in drain_source
 
 
 def test_gui_role_network_copy_explains_internal_report_behavior():
@@ -241,6 +274,35 @@ def test_gui_role_network_status_includes_selected_sheet_and_fallback_notice():
     assert "Role 1개 / 대역 2개 / 중복 1행 제외 / Sheet: 사내대역" in message
     assert ROLE_NETWORKS_FALLBACK_NOTICE in message
     assert "내부용 보고서" in message
+
+
+def test_result_report_summary_counts_collection_and_role_network_matches():
+    fixture_root = Path(__file__).parent / "fixtures"
+    controller = Controller(name="sample_controller", host="192.0.2.10")
+    result = collect_from_offline_raw(controller, fixture_root)
+    parsed = build_parsed_controllers([result])
+
+    no_mapping_summary = _result_report_summary_from_parsed(parsed, [])
+
+    assert no_mapping_summary.ssid_count == 2
+    assert no_mapping_summary.role_count == 3
+    assert no_mapping_summary.matched_count == 0
+    assert no_mapping_summary.mismatched_count == 0
+    assert "사내 Role 대역표" in no_mapping_summary.note
+
+    role_networks = [
+        RoleNetworkDefinition(role="guest-logon", network="10.30.0.0/24", subnet_mask=""),
+        RoleNetworkDefinition(role="corp-employee", network="10.40.99.0/24", subnet_mask=""),
+        RoleNetworkDefinition(role="missing-role", network="10.99.0.0/24", subnet_mask=""),
+    ]
+
+    summary = _result_report_summary_from_parsed(parsed, role_networks)
+
+    assert summary.ssid_count == 2
+    assert summary.role_count == 3
+    assert summary.matched_count == 1
+    assert summary.mismatched_count == 3
+    assert "Role 단위" in summary.note
 
 
 def test_log_tag_for_line_classifies_operational_log_levels():

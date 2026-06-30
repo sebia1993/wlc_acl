@@ -14,6 +14,7 @@ import subprocess
 import sys
 import threading
 import tkinter as tk
+from dataclasses import dataclass
 from pathlib import Path
 from tkinter import filedialog, messagebox
 
@@ -23,7 +24,7 @@ from .collector import collect_from_controller
 from .diagnostic_mode import run_diagnostic
 from .diagnostics import classify_error_message, summarize_collection_failure
 from .gui_support import GuiConnectionInput, build_target_from_gui_input, default_gui_output_dir
-from .models import CollectionResult, CommandOutput
+from .models import CollectionResult, CommandOutput, ParsedController, RoleNetworkDefinition
 from .report import build_parsed_controllers, timestamp_slug, write_raw_result, write_reports
 from .role_networks import RoleNetworkDefinitionError, RoleNetworkLoadSummary, load_role_network_definitions_with_summary
 
@@ -99,6 +100,10 @@ LOG_HIDE_LABEL = "수집 로그 숨김"
 OPEN_HTML_LABEL = "HTML 보고서 열기"
 OPEN_XLSX_LABEL = "Excel 열기"
 OPEN_FOLDER_LABEL = "결과 폴더 열기"
+RESULT_FOLDER_ACTION_LABEL = "Excel 결과 폴더 열기"
+RESULT_HTML_ACTION_TEXT = f"[HTML] {OPEN_HTML_LABEL}"
+RESULT_FOLDER_ACTION_TEXT = f"[DIR] {RESULT_FOLDER_ACTION_LABEL}"
+RESULT_XLSX_ACTION_TEXT = f"[XLSX] {OPEN_XLSX_LABEL}"
 REPORT_COMPLETE_TITLE = "보고서 생성 완료"
 REPORT_COMPLETE_MESSAGE = "보고서 생성이 완료되었습니다"
 ROLE_NETWORK_LABEL = "사내 Role 대역표(Excel)"
@@ -160,6 +165,15 @@ STAGE_PROGRESS = {
     "completed": 100,
     "failed": 100,
 }
+
+
+@dataclass(frozen=True)
+class ResultReportSummary:
+    ssid_count: int = 0
+    role_count: int = 0
+    matched_count: int = 0
+    mismatched_count: int = 0
+    note: str = "수집 완료 후 표시됩니다."
 
 
 def _enable_windows_dpi_awareness() -> None:
@@ -266,6 +280,11 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         self.stage_var = tk.StringVar(value=STAGE_LABELS["ready"])
         self.ssh_status_var = tk.StringVar(value="대기")
         self.running_progress_title_var = tk.StringVar(value="데이터 수집 진행 중")
+        self.result_ssid_count_var = tk.StringVar(value="0")
+        self.result_role_count_var = tk.StringVar(value="0")
+        self.result_matched_count_var = tk.StringVar(value="0")
+        self.result_mismatched_count_var = tk.StringVar(value="0")
+        self.result_summary_note_var = tk.StringVar(value="수집 완료 후 표시됩니다.")
 
         self._style()
         self._set_initial_window_bounds()
@@ -977,19 +996,63 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         return button
 
     def _report_panel(self, parent: tk.Widget) -> None:
-        ctk.CTkLabel(parent, text="결과 확인", text_color=TEXT_COLOR, font=("Segoe UI Semibold", 13)).pack(
+        ctk.CTkLabel(parent, text="결과 보고서 확인", text_color=TEXT_COLOR, font=("Segoe UI Semibold", 13)).pack(
             anchor="w", padx=16, pady=(14, 0)
         )
         ctk.CTkLabel(
             parent,
-            text="마지막 실행 결과를 열거나 결과 폴더로 이동합니다.",
+            text="마지막 수집 결과의 핵심 수치를 확인하고 HTML 보고서 또는 Excel 결과 폴더를 바로 엽니다.",
             text_color=MUTED_COLOR,
             font=("Segoe UI", 10),
             anchor="w",
             justify="left",
         ).pack(anchor="w", fill="x", padx=16, pady=(4, 0))
-        ctk.CTkLabel(parent, text="보고서 파일", text_color=MUTED_COLOR, font=("Segoe UI Semibold", 9)).pack(
-            anchor="w", padx=16, pady=(14, 0)
+
+        cards = ctk.CTkFrame(parent, fg_color="transparent")
+        cards.pack(fill="x", padx=16, pady=(14, 0))
+        for column in range(4):
+            cards.grid_columnconfigure(column, weight=1, uniform="result_summary")
+        self._result_summary_card(
+            cards,
+            title="SSID",
+            value_var=self.result_ssid_count_var,
+            caption="수집된 SSID",
+            accent_color=ACCENT_DARK_COLOR,
+        ).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        self._result_summary_card(
+            cards,
+            title="Role",
+            value_var=self.result_role_count_var,
+            caption="수집된 Role",
+            accent_color=TEXT_COLOR,
+        ).grid(row=0, column=1, sticky="ew", padx=6)
+        self._result_summary_card(
+            cards,
+            title="일치",
+            value_var=self.result_matched_count_var,
+            caption="대역표 기준",
+            accent_color=SUCCESS_COLOR,
+        ).grid(row=0, column=2, sticky="ew", padx=6)
+        self._result_summary_card(
+            cards,
+            title="불일치",
+            value_var=self.result_mismatched_count_var,
+            caption="누락 포함",
+            accent_color=WARNING_COLOR,
+        ).grid(row=0, column=3, sticky="ew", padx=(6, 0))
+
+        ctk.CTkLabel(
+            parent,
+            textvariable=self.result_summary_note_var,
+            text_color=MUTED_COLOR,
+            font=("Segoe UI", 9),
+            anchor="w",
+            justify="left",
+            wraplength=720,
+        ).pack(anchor="w", fill="x", padx=16, pady=(8, 0))
+
+        ctk.CTkLabel(parent, text="보고서 바로 열기", text_color=MUTED_COLOR, font=("Segoe UI Semibold", 9)).pack(
+            anchor="w", padx=16, pady=(16, 0)
         )
 
         outputs = ctk.CTkFrame(parent, fg_color="transparent")
@@ -997,18 +1060,98 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         outputs.grid_columnconfigure(0, weight=1, uniform="result_actions")
         outputs.grid_columnconfigure(1, weight=1, uniform="result_actions")
 
-        self.open_html_button = self._button(
-            outputs, text=OPEN_HTML_LABEL, variant="primary", command=self._open_html, state="disabled"
+        self.open_html_button = self._result_action_button(
+            outputs,
+            text=RESULT_HTML_ACTION_TEXT,
+            command=self._open_html,
+            state="disabled",
+            variant="primary",
         )
-        self.open_html_button.grid(row=0, column=0, columnspan=2, sticky="ew")
+        self.open_html_button.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        self.open_folder_button = self._result_action_button(
+            outputs,
+            text=RESULT_FOLDER_ACTION_TEXT,
+            command=self._open_output_folder,
+            state="disabled",
+            variant="folder",
+        )
+        self.open_folder_button.grid(row=0, column=1, sticky="ew", padx=(6, 0))
         self.open_xlsx_button = self._button(
-            outputs, text=OPEN_XLSX_LABEL, command=self._open_xlsx, state="disabled"
+            outputs,
+            text=RESULT_XLSX_ACTION_TEXT,
+            command=self._open_xlsx,
+            state="disabled",
         )
-        self.open_xlsx_button.grid(row=1, column=0, sticky="ew", padx=(0, 6), pady=(8, 0))
-        self.open_folder_button = self._button(
-            outputs, text=OPEN_FOLDER_LABEL, command=self._open_output_folder, state="disabled"
+        self.open_xlsx_button.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+
+    def _result_summary_card(
+        self,
+        parent: tk.Widget,
+        *,
+        title: str,
+        value_var: tk.StringVar,
+        caption: str,
+        accent_color: str,
+    ) -> ctk.CTkFrame:
+        card = ctk.CTkFrame(
+            parent,
+            fg_color=CONTROL_BG,
+            border_width=1,
+            border_color=LINE_STRONG_COLOR,
+            corner_radius=8,
         )
-        self.open_folder_button.grid(row=1, column=1, sticky="ew", padx=(6, 0), pady=(8, 0))
+        card.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            card,
+            text=title,
+            text_color=MUTED_COLOR,
+            font=("Segoe UI Semibold", 9),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="ew", padx=12, pady=(10, 0))
+        ctk.CTkLabel(
+            card,
+            textvariable=value_var,
+            text_color=accent_color,
+            font=("Segoe UI Semibold", 24),
+            anchor="w",
+        ).grid(row=1, column=0, sticky="ew", padx=12, pady=(2, 0))
+        ctk.CTkLabel(
+            card,
+            text=caption,
+            text_color=MUTED_COLOR,
+            font=("Segoe UI", 9),
+            anchor="w",
+        ).grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 10))
+        return card
+
+    def _result_action_button(
+        self,
+        parent: tk.Widget,
+        *,
+        text: str,
+        command=None,
+        state: str = "normal",
+        variant: str = "primary",
+    ) -> ctk.CTkButton:
+        if variant == "primary":
+            fg_color = ACCENT_COLOR
+            hover_color = ACCENT_ACTIVE_COLOR
+        else:
+            fg_color = CONTROL_BG
+            hover_color = CONTROL_HOVER_BG
+        return ctk.CTkButton(
+            parent,
+            text=text,
+            command=command,
+            state=state,
+            height=58,
+            corner_radius=8,
+            fg_color=fg_color,
+            hover_color=hover_color,
+            text_color="#ffffff" if variant == "primary" else TEXT_COLOR,
+            text_color_disabled="#6b7280",
+            font=("Segoe UI Semibold", 13),
+        )
 
     def _scrollable_form(self, parent: tk.Widget) -> ctk.CTkScrollableFrame:
         form = ctk.CTkScrollableFrame(
@@ -1469,7 +1612,12 @@ class WlcRoleAclCollectorGui(ctk.CTk):
             )
             log_lines.extend(["Status: completed", f"Excel: {files['xlsx']}", f"HTML: {files['html']}"])
             _write_run_log(run_dir, log_lines)
-            payload = {"run_dir": run_dir, "html": files["html"], "xlsx": files["xlsx"]}
+            payload = {
+                "run_dir": run_dir,
+                "html": files["html"],
+                "xlsx": files["xlsx"],
+                "summary": _result_report_summary_from_parsed(parsed, role_networks),
+            }
             self.event_queue.put(("done", payload))
         except Exception as exc:
             failure = classify_error_message(str(exc))
@@ -1540,6 +1688,7 @@ class WlcRoleAclCollectorGui(ctk.CTk):
                     self.status_var.set("완료되었습니다. HTML 보고서를 먼저 확인하세요.")
                     self._set_stage("completed")
                     self._set_running(False)
+                    self._set_result_summary(paths.get("summary"))
                     self._set_result_buttons(folder_enabled=True, report_enabled=True)
                     self._show_report_complete_dialog(paths)
                 elif event == "diagnostic_done":
@@ -1549,6 +1698,9 @@ class WlcRoleAclCollectorGui(ctk.CTk):
                     self.last_html = paths.get("html")
                     self.last_xlsx = None
                     self.last_diagnostic_json = paths.get("json")
+                    self._set_result_summary(
+                        ResultReportSummary(note="안전 진단 결과입니다. SSID/Role 요약은 일반 수집 완료 후 표시됩니다.")
+                    )
                     self.status_var.set(f"안전 진단 완료: {primary_code}")
                     self._set_stage("completed" if primary_code == "OK" else "failed")
                     self._set_running(False)
@@ -1568,12 +1720,14 @@ class WlcRoleAclCollectorGui(ctk.CTk):
                         self.last_run_dir = payload.get("run_dir")
                         self.last_html = None
                         self.last_xlsx = None
+                        self._set_result_summary(ResultReportSummary(note="실패했습니다. 수집 로그를 확인하세요."))
                         self._log(f"ERROR: {message}")
                         if payload.get("run_log"):
                             self._log(f"Run log: {payload['run_log']}")
                         self._set_result_buttons(folder_enabled=bool(self.last_run_dir), report_enabled=False)
                     else:
                         message = str(payload)
+                        self._set_result_summary(ResultReportSummary(note="실패했습니다. 수집 로그를 확인하세요."))
                         self._log(f"ERROR: {message}")
                         self._set_result_buttons(folder_enabled=False, report_enabled=False)
                     self.status_var.set("실패했습니다. 오류 메시지와 수집 로그를 확인하세요.")
@@ -1591,6 +1745,7 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         self.diagnostic_button.configure(state="disabled" if running else "normal")
         if running:
             self._set_stage("connecting")
+            self._set_result_summary(ResultReportSummary(note="수집 중입니다. 완료 후 요약 수치가 표시됩니다."))
             self._set_result_buttons(folder_enabled=False, report_enabled=False)
         else:
             if self.stage_var.get() not in {STAGE_LABELS["completed"], STAGE_LABELS["failed"]}:
@@ -1648,13 +1803,13 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         run_dir = paths.get("run_dir")
         self._button(
             actions,
-            text=OPEN_HTML_LABEL,
+            text=RESULT_HTML_ACTION_TEXT,
             variant="primary",
             command=lambda: _open_path(html_path) if html_path else None,
         ).grid(row=0, column=0, sticky="ew", padx=(0, 6))
         self._button(
             actions,
-            text=OPEN_FOLDER_LABEL,
+            text=RESULT_FOLDER_ACTION_TEXT,
             command=lambda: _open_path(run_dir) if run_dir else None,
         ).grid(row=0, column=1, sticky="ew", padx=(6, 0))
         self._button(actions, text="닫기", command=window.destroy).grid(
@@ -1682,6 +1837,15 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         self.open_folder_button.configure(state="normal" if folder_enabled else "disabled")
         self.open_html_button.configure(state="normal" if report_enabled else "disabled")
         self.open_xlsx_button.configure(state="normal" if xlsx_enabled else "disabled")
+
+    def _set_result_summary(self, summary: object) -> None:
+        if not isinstance(summary, ResultReportSummary):
+            summary = ResultReportSummary()
+        self.result_ssid_count_var.set(str(summary.ssid_count))
+        self.result_role_count_var.set(str(summary.role_count))
+        self.result_matched_count_var.set(str(summary.matched_count))
+        self.result_mismatched_count_var.set(str(summary.mismatched_count))
+        self.result_summary_note_var.set(summary.note)
 
     def _log(self, text: str) -> None:
         self.log_text.configure(state="normal")
@@ -1884,6 +2048,97 @@ def _find_role_network_template() -> Path | None:
         if candidate.exists():
             return candidate
     return None
+
+
+def _result_report_summary_from_parsed(
+    parsed_controllers: list[ParsedController],
+    role_networks: list[RoleNetworkDefinition] | None,
+) -> ResultReportSummary:
+    ssids: set[tuple[str, str]] = set()
+    roles: set[tuple[str, str]] = set()
+    collected_role_names: set[str] = set()
+
+    for parsed in parsed_controllers:
+        controller_name = parsed.controller.name
+        for mapping in parsed.ssid_role_mappings:
+            if mapping.ssid:
+                ssids.add((controller_name, mapping.ssid.casefold()))
+            if mapping.role:
+                roles.add((controller_name, mapping.role.casefold()))
+                collected_role_names.add(mapping.role.casefold())
+        for role in parsed.role_policies:
+            roles.add((controller_name, role.casefold()))
+            collected_role_names.add(role.casefold())
+        for role in parsed.user_role_observations:
+            roles.add((controller_name, role.casefold()))
+            collected_role_names.add(role.casefold())
+        for context in parsed.role_network_contexts:
+            if context.role:
+                roles.add((controller_name, context.role.casefold()))
+                collected_role_names.add(context.role.casefold())
+
+    if not role_networks:
+        return ResultReportSummary(
+            ssid_count=len(ssids),
+            role_count=len(roles),
+            note="사내 Role 대역표를 선택하면 일치/불일치 항목 수가 함께 표시됩니다.",
+        )
+
+    local_lookup = _role_network_lookup_for_summary(role_networks)
+    matched_count = 0
+    mismatched_count = 0
+
+    for parsed in parsed_controllers:
+        for role in _collected_roles_for_summary(parsed):
+            local_networks = local_lookup.get(role.casefold(), [])
+            wlc_networks = _wlc_configured_subnets_for_summary(parsed, role)
+            if local_networks and wlc_networks and set(local_networks) == set(wlc_networks):
+                matched_count += 1
+            else:
+                mismatched_count += 1
+
+    for role_key in local_lookup:
+        if role_key not in collected_role_names:
+            mismatched_count += 1
+
+    return ResultReportSummary(
+        ssid_count=len(ssids),
+        role_count=len(roles),
+        matched_count=matched_count,
+        mismatched_count=mismatched_count,
+        note="일치/불일치는 사내 Role 대역표와 WLC 수집 대역을 Role 단위로 비교한 값입니다.",
+    )
+
+
+def _role_network_lookup_for_summary(role_networks: list[RoleNetworkDefinition]) -> dict[str, list[str]]:
+    lookup: dict[str, list[str]] = {}
+    for definition in role_networks:
+        role_key = definition.role.casefold()
+        lookup.setdefault(role_key, [])
+        if definition.network not in lookup[role_key]:
+            lookup[role_key].append(definition.network)
+    return lookup
+
+
+def _collected_roles_for_summary(parsed: ParsedController) -> list[str]:
+    roles = (
+        set(parsed.role_policies)
+        | set(parsed.user_role_observations)
+        | {mapping.role for mapping in parsed.ssid_role_mappings if mapping.role}
+        | {context.role for context in parsed.role_network_contexts if context.role}
+    )
+    return sorted(roles, key=str.casefold)
+
+
+def _wlc_configured_subnets_for_summary(parsed: ParsedController, role: str) -> list[str]:
+    networks = [
+        context.configured_subnet
+        for context in parsed.role_network_contexts
+        if context.role.casefold() == role.casefold()
+        and context.configured_subnet
+        and context.configured_subnet.casefold() != "unknown"
+    ]
+    return list(dict.fromkeys(networks))
 
 
 def _role_networks_status_message(summary: RoleNetworkLoadSummary) -> str:

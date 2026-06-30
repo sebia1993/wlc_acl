@@ -46,6 +46,8 @@ ACCENT_COLOR = "#2563eb"
 ACCENT_ACTIVE_COLOR = "#1d4ed8"
 ACCENT_DARK_COLOR = "#bfdbfe"
 ACCENT_SOFT_BG = "#1e3a8a"
+RUN_ACTION_COLOR = "#28A745"
+RUN_ACTION_HOVER_COLOR = "#218838"
 SUCCESS_COLOR = "#86efac"
 SUCCESS_SOFT_BG = "#14532d"
 WARNING_COLOR = "#fcd34d"
@@ -79,7 +81,7 @@ ctk.set_default_color_theme(CUSTOMTKINTER_COLOR_THEME)
 WLC_IP_LABEL = "WLC IP"
 REPORT_NAME_LABEL = "보고서 이름(선택)"
 WLC_TARGET_NOTICE = "Mobility Master(MM)가 아니라 실제 WLC 컨트롤러 IP를 입력하세요."
-COLLECTION_ACTION_LABEL = "수집 시작"
+COLLECTION_ACTION_LABEL = "분석 시작"
 DIAGNOSTIC_ACTION_LABEL = "안전 진단"
 ADVANCED_OPTIONS_SHOW_LABEL = "고급 옵션 표시"
 ADVANCED_OPTIONS_HIDE_LABEL = "고급 옵션 숨김"
@@ -88,12 +90,12 @@ LOG_HIDE_LABEL = "수집 로그 숨김"
 OPEN_HTML_LABEL = "HTML 보고서 열기"
 OPEN_XLSX_LABEL = "Excel 열기"
 OPEN_FOLDER_LABEL = "결과 폴더 열기"
-ROLE_NETWORK_LABEL = "사내 Role 대역표"
+ROLE_NETWORK_LABEL = "사내 Role 대역표(Excel)"
 ROLE_NETWORK_HELP = (
     "선택하면 내부용 HTML/Excel 보고서에 실제 Role 대역과 WLC 비교 상태를 표시합니다."
 )
 ROLE_NETWORK_EMPTY_STATUS = "선택 사항: 사내에서 관리하는 표준 Role 대역표(.xlsx/.xlsm)를 선택하세요."
-ROLE_NETWORK_SELECT_LABEL = "파일 선택"
+ROLE_NETWORK_SELECT_LABEL = "찾아보기"
 ROLE_NETWORK_GUIDE_LABEL = "작성법"
 ROLE_NETWORK_TEMPLATE_LABEL = "샘플 열기"
 ROLE_NETWORK_TEMPLATE_NAME = "role_networks.example.xlsx"
@@ -232,6 +234,7 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         self._fit_after_id: str | None = None
         self.stage_label_widgets: dict[str, ctk.CTkLabel] = {}
         self.sidebar_menu_buttons: dict[str, ctk.CTkButton] = {}
+        self.start_buttons: list[ctk.CTkButton] = []
         self.last_run_dir: Path | None = None
         self.last_html: Path | None = None
         self.last_xlsx: Path | None = None
@@ -386,7 +389,7 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         ).grid(row=0, column=0, sticky="w", padx=18, pady=(16, 0))
         ctk.CTkLabel(
             header,
-            text="접속 정보 입력, 수집 시작, 결과 확인 순서로 WLC Role ACL 보고서를 생성합니다.",
+            text="접속 정보 입력, 분석 시작, 결과 확인 순서로 WLC Role ACL 보고서를 생성합니다.",
             text_color=MUTED_COLOR,
             font=("Segoe UI", 10),
             anchor="w",
@@ -497,30 +500,101 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         parent.grid_rowconfigure(0, weight=1)
         form = self._scrollable_form(parent)
 
-        self._section_label(form, "1. 접속 정보")
-        self._notice(form, WLC_TARGET_NOTICE)
-        self._entry(form, WLC_IP_LABEL, self.host_var)
-        self._entry(form, REPORT_NAME_LABEL, self.name_var, hint="비워두면 wlc-IP 형식으로 자동 지정됩니다.")
-        self._protocol_row(form)
+        self._connection_settings_group(form)
+        self._analysis_settings_group(form)
+        self._output_settings_group(form)
+        self._settings_run_group(form)
 
-        self._section_label(form, "2. 인증 정보")
-        self._entry(form, "Username", self.username_var)
-        self._entry(form, "Password", self.password_var, show="*")
-        self._entry(form, "Enable password", self.enable_password_var, show="*")
+    def _settings_group_frame(self, parent: tk.Widget, title: str, description: str = "") -> ctk.CTkFrame:
+        frame = ctk.CTkFrame(
+            parent,
+            fg_color=PANEL_SUBTLE_BG,
+            border_width=1,
+            border_color=LINE_COLOR,
+            corner_radius=8,
+        )
+        frame.pack(fill="x", pady=(0, 14))
+        frame.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            frame,
+            text=title,
+            text_color=TEXT_COLOR,
+            font=("Segoe UI Semibold", 13),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="ew", padx=14, pady=(14, 0))
+        if description:
+            ctk.CTkLabel(
+                frame,
+                text=description,
+                text_color=MUTED_COLOR,
+                font=("Segoe UI", 9),
+                wraplength=620,
+                anchor="w",
+                justify="left",
+            ).grid(row=1, column=0, sticky="ew", padx=14, pady=(3, 10))
+        return frame
 
-        self._section_label(form, "3. 결과 저장")
-        output_row = ctk.CTkFrame(form, fg_color="transparent")
+    def _connection_settings_group(self, parent: tk.Widget) -> None:
+        group = self._settings_group_frame(
+            parent,
+            "장비 접속 설정",
+            "WLC 접속에 필요한 장비 주소와 인증 정보를 입력합니다.",
+        )
+        content = ctk.CTkFrame(group, fg_color="transparent")
+        content.grid(row=2, column=0, sticky="ew", padx=14, pady=(0, 14))
+        self._notice(content, WLC_TARGET_NOTICE)
+        self._entry(content, WLC_IP_LABEL, self.host_var)
+        self._entry(content, "계정", self.username_var)
+        self._entry(content, "암호", self.password_var, show="*")
+
+    def _analysis_settings_group(self, parent: tk.Widget) -> None:
+        group = self._settings_group_frame(
+            parent,
+            "분석 옵션",
+            "보고서 이름, 접속 방식, 내부 Role 대역표를 설정합니다.",
+        )
+        content = ctk.CTkFrame(group, fg_color="transparent")
+        content.grid(row=2, column=0, sticky="ew", padx=14, pady=(0, 14))
+        self._entry(content, REPORT_NAME_LABEL, self.name_var, hint="비워두면 wlc-IP 형식으로 자동 지정됩니다.")
+        self._protocol_row(content)
+        self._role_networks_row(content)
+
+        self.advanced_toggle_button = self._button(
+            content,
+            text=ADVANCED_OPTIONS_SHOW_LABEL,
+            command=self._toggle_advanced_options,
+        )
+        self.advanced_toggle_button.pack(fill="x", pady=(10, 0))
+        self.advanced_options_container = ctk.CTkFrame(content, fg_color="transparent")
+        self._section_label(self.advanced_options_container, "고급 옵션")
+        self._entry(self.advanced_options_container, "Enable password", self.enable_password_var, show="*")
+        self._timeout_row(self.advanced_options_container)
+
+    def _output_settings_group(self, parent: tk.Widget) -> None:
+        group = self._settings_group_frame(
+            parent,
+            "결과 저장",
+            "분석 결과가 저장될 로컬 폴더를 선택합니다.",
+        )
+        content = ctk.CTkFrame(group, fg_color="transparent")
+        content.grid(row=2, column=0, sticky="ew", padx=14, pady=(0, 14))
+        output_row = ctk.CTkFrame(content, fg_color="transparent")
         output_row.pack(fill="x", pady=(4, 8))
         ctk.CTkEntry(output_row, textvariable=self.output_dir_var, height=34, corner_radius=6).pack(
             side="left", fill="x", expand=True
         )
         self._button(output_row, text="폴더 선택", command=self._browse_output).pack(side="left", padx=(8, 0))
-        self.advanced_toggle_button = self._button(form, text=ADVANCED_OPTIONS_SHOW_LABEL, command=self._toggle_advanced_options)
-        self.advanced_toggle_button.pack(fill="x", pady=(10, 0))
-        self.advanced_options_container = ctk.CTkFrame(form, fg_color="transparent")
-        self._section_label(self.advanced_options_container, "고급 옵션")
-        self._role_networks_row(self.advanced_options_container)
-        self._timeout_row(self.advanced_options_container)
+
+    def _settings_run_group(self, parent: tk.Widget) -> None:
+        group = self._settings_group_frame(
+            parent,
+            "실행",
+            "입력한 설정으로 WLC Role ACL 분석을 시작합니다.",
+        )
+        content = ctk.CTkFrame(group, fg_color="transparent")
+        content.grid(row=2, column=0, sticky="ew", padx=14, pady=(0, 14))
+        content.grid_columnconfigure(0, weight=1)
+        self._start_action_button(content).grid(row=0, column=0, sticky="ew")
 
     def _build_collection_tab(self, parent: tk.Widget) -> None:
         content = ctk.CTkFrame(parent, fg_color="transparent")
@@ -697,6 +771,19 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         variant: str = "secondary",
         state: str = "normal",
     ) -> ctk.CTkButton:
+        if variant == "run":
+            return ctk.CTkButton(
+                parent,
+                text=text,
+                command=command,
+                state=state,
+                height=44,
+                corner_radius=6,
+                fg_color=RUN_ACTION_COLOR,
+                hover_color=RUN_ACTION_HOVER_COLOR,
+                text_color="#ffffff",
+                font=("Segoe UI Semibold", 12),
+            )
         if variant == "primary":
             return ctk.CTkButton(
                 parent,
@@ -813,13 +900,18 @@ class WlcRoleAclCollectorGui(ctk.CTk):
         actions.pack(fill="x", padx=16, pady=(12, 0))
         actions.grid_columnconfigure(0, weight=1)
 
-        self.start_button = self._button(
-            actions,
+        self._start_action_button(actions).grid(row=0, column=0, sticky="ew")
+
+    def _start_action_button(self, parent: tk.Widget) -> ctk.CTkButton:
+        button = self._button(
+            parent,
             text=COLLECTION_ACTION_LABEL,
-            variant="primary",
+            variant="run",
             command=self._start_collection,
         )
-        self.start_button.grid(row=0, column=0, sticky="ew")
+        self.start_buttons.append(button)
+        self.start_button = button
+        return button
 
     def _report_panel(self, parent: tk.Widget) -> None:
         ctk.CTkLabel(parent, text="결과 확인", text_color=TEXT_COLOR, font=("Segoe UI Semibold", 13)).pack(
@@ -1426,7 +1518,8 @@ class WlcRoleAclCollectorGui(ctk.CTk):
 
     def _set_running(self, running: bool) -> None:
         self.is_running = running
-        self.start_button.configure(state="disabled" if running else "normal")
+        for button in self.start_buttons:
+            button.configure(state="disabled" if running else "normal")
         self.diagnostic_button.configure(state="disabled" if running else "normal")
         if running:
             self._set_stage("connecting")

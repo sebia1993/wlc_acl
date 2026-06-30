@@ -28,6 +28,7 @@ from wlc_role_acl_collector.gui_app import (
     ROLE_NETWORK_LABEL,
     ROLE_NETWORK_SELECT_LABEL,
     ROLE_NETWORK_TEMPLATE_LABEL,
+    RUN_ACTION_COLOR,
     SETTINGS_MENU_LABEL,
     SIDEBAR_WIDTH,
     SSH_STATUS_LABEL,
@@ -121,7 +122,8 @@ def test_gui_stage_labels_support_operational_console_flow():
 
 
 def test_gui_actions_prioritize_collection_and_html_result():
-    assert COLLECTION_ACTION_LABEL == "수집 시작"
+    assert COLLECTION_ACTION_LABEL == "분석 시작"
+    assert RUN_ACTION_COLOR == "#28A745"
     assert DIAGNOSTIC_ACTION_LABEL == "안전 진단"
     assert ADVANCED_OPTIONS_SHOW_LABEL == "고급 옵션 표시"
     assert ADVANCED_OPTIONS_HIDE_LABEL == "고급 옵션 숨김"
@@ -133,8 +135,8 @@ def test_gui_actions_prioritize_collection_and_html_result():
 
 
 def test_gui_role_network_copy_explains_internal_report_behavior():
-    assert ROLE_NETWORK_LABEL == "사내 Role 대역표"
-    assert ROLE_NETWORK_SELECT_LABEL == "파일 선택"
+    assert ROLE_NETWORK_LABEL == "사내 Role 대역표(Excel)"
+    assert ROLE_NETWORK_SELECT_LABEL == "찾아보기"
     assert ROLE_NETWORK_GUIDE_LABEL == "작성법"
     assert ROLE_NETWORK_TEMPLATE_LABEL == "샘플 열기"
     assert "내부용 HTML/Excel 보고서" in ROLE_NETWORK_HELP
@@ -145,6 +147,24 @@ def test_gui_role_network_copy_explains_internal_report_behavior():
     assert "10.40.1.0/24" in ROLE_NETWORK_GUIDE_TEXT
     assert "같은 Role에 여러 대역" in ROLE_NETWORK_GUIDE_TEXT
     assert "내부망 전용 보고서" in ROLE_NETWORK_GUIDE_TEXT
+
+
+def test_settings_screen_groups_connection_entries_and_role_excel_picker():
+    settings_source = inspect.getsource(WlcRoleAclCollectorGui._connection_settings_group)
+    analysis_source = inspect.getsource(WlcRoleAclCollectorGui._analysis_settings_group)
+    run_source = inspect.getsource(WlcRoleAclCollectorGui._settings_run_group)
+    start_button_source = inspect.getsource(WlcRoleAclCollectorGui._start_action_button)
+    role_source = inspect.getsource(WlcRoleAclCollectorGui._role_networks_row)
+
+    assert "장비 접속 설정" in settings_source
+    assert "WLC_IP_LABEL" in settings_source
+    assert '"계정"' in settings_source
+    assert '"암호"' in settings_source
+    assert "self._role_networks_row(content)" in analysis_source
+    assert "side=\"left\", fill=\"x\", expand=True" in role_source
+    assert "ROLE_NETWORK_SELECT_LABEL" in role_source
+    assert "self._start_action_button(content)" in run_source
+    assert 'variant="run"' in start_button_source
 
 
 def test_gui_can_find_packaged_role_network_template():

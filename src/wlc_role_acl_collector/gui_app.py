@@ -22,7 +22,7 @@ from .diagnostics import classify_error_message, summarize_collection_failure
 from .gui_support import GuiConnectionInput, build_target_from_gui_input, default_gui_output_dir
 from .models import CollectionResult, CommandOutput
 from .report import build_parsed_controllers, timestamp_slug, write_raw_result, write_reports
-from .role_networks import RoleNetworkDefinitionError, load_role_network_definitions_with_summary
+from .role_networks import RoleNetworkDefinitionError, RoleNetworkLoadSummary, load_role_network_definitions_with_summary
 
 
 DEFAULT_WINDOW_SIZE = (1080, 720)
@@ -75,6 +75,11 @@ ROLE_NETWORK_TEMPLATE_LABEL = "샘플 열기"
 ROLE_NETWORK_TEMPLATE_NAME = "role_networks.example.xlsx"
 ROLE_NETWORK_GUIDE_TITLE = "사내 Role 대역표 작성법"
 ROLE_NETWORK_GUIDE_TEXT = """사내 Role 대역표 작성법
+
+Sheet 선택 기준
+- Role_Networks Sheet가 있으면 Sheet 순서와 관계없이 그 Sheet를 우선 읽습니다.
+- Role_Networks Sheet가 없을 때만 첫 번째 Sheet를 읽고 화면에 fallback 안내를 표시합니다.
+- 작성가이드 같은 안내 Sheet가 첫 번째에 있어도 Role_Networks Sheet가 있으면 안내 Sheet는 읽지 않습니다.
 
 필수 컬럼
 - Role 이름: WLC에서 수집되는 Role 이름과 정확히 맞춰 작성합니다.
@@ -711,7 +716,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
         ).pack(anchor="w")
         tk.Label(
             container,
-            text="샘플 Excel을 복사해 첫 번째 시트(Role_Networks)에 사내 기준 대역을 입력하세요.",
+            text="샘플 Excel의 Role_Networks Sheet에 사내 기준 대역을 입력하세요. 해당 Sheet가 없으면 첫 번째 Sheet를 읽습니다.",
             bg=PANEL_BG,
             fg=MUTED_COLOR,
             font=("Segoe UI", 9),
@@ -768,11 +773,7 @@ class WlcRoleAclCollectorGui(tk.Tk):
             self.role_networks_status_var.set(ROLE_NETWORK_EMPTY_STATUS)
             return []
         summary = load_role_network_definitions_with_summary(Path(role_networks_path))
-        duplicate_note = f" / 중복 {summary.duplicate_count}행 제외" if summary.duplicate_count else ""
-        self.role_networks_status_var.set(
-            f"로드됨: Role {summary.role_count}개 / 대역 {summary.network_count}개{duplicate_note}. "
-            "이번 실행의 내부용 보고서에 표시됩니다."
-        )
+        self.role_networks_status_var.set(_role_networks_status_message(summary))
         return summary.definitions
 
     def _set_stage(self, stage: str) -> None:
@@ -1246,6 +1247,15 @@ def _find_role_network_template() -> Path | None:
         if candidate.exists():
             return candidate
     return None
+
+
+def _role_networks_status_message(summary: RoleNetworkLoadSummary) -> str:
+    duplicate_note = f" / 중복 {summary.duplicate_count}행 제외" if summary.duplicate_count else ""
+    sheet_note = f" / Sheet: {summary.sheet_name}" if summary.sheet_name else ""
+    message = f"로드됨: Role {summary.role_count}개 / 대역 {summary.network_count}개{duplicate_note}{sheet_note}."
+    if summary.sheet_notice:
+        message = f"{message} {summary.sheet_notice}"
+    return f"{message} 이번 실행의 내부용 보고서에 표시됩니다."
 
 
 def _open_path(path: Path) -> None:

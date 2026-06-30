@@ -4,6 +4,7 @@ import pytest
 from openpyxl import Workbook, load_workbook
 
 from wlc_role_acl_collector.role_networks import (
+    ROLE_NETWORKS_FALLBACK_NOTICE,
     RoleNetworkDefinitionError,
     load_role_network_definitions,
     load_role_network_definitions_with_summary,
@@ -93,6 +94,7 @@ def test_packaged_role_network_template_contains_input_and_guide_sheets():
     assert ("corp-employee", "10.40.2.0/24") == input_rows[3][:2]
     assert "같은 Role에 여러 대역" in guide_text
     assert "내부망 전용" in guide_text
+    assert "Role_Networks Sheet가 있으면" in guide_text
 
     definitions = load_role_network_definitions(path)
     assert [(item.role, item.network) for item in definitions] == [
@@ -100,6 +102,89 @@ def test_packaged_role_network_template_contains_input_and_guide_sheets():
         ("corp-employee", "10.40.1.0/24"),
         ("corp-employee", "10.40.2.0/24"),
     ]
+
+
+def test_load_role_network_definitions_prefers_role_networks_sheet_even_when_second(tmp_path):
+    path = tmp_path / "role_networks.xlsx"
+    _write_multi_sheet_workbook(
+        path,
+        [
+            (
+                "사내대역",
+                [
+                    ["Role 이름", "네트워크 대역"],
+                    ["wrong-first-sheet", "192.0.2.0/24"],
+                ],
+            ),
+            (
+                "Role_Networks",
+                [
+                    ["Role 이름", "네트워크 대역"],
+                    ["guest-logon", "10.30.0.0/24"],
+                    ["corp-employee", "10.40.1.0/24"],
+                ],
+            ),
+        ],
+    )
+
+    summary = load_role_network_definitions_with_summary(path)
+
+    assert summary.sheet_name == "Role_Networks"
+    assert summary.sheet_fallback_used is False
+    assert summary.sheet_notice == ""
+    assert [(item.role, item.network, item.source_row) for item in summary.definitions] == [
+        ("guest-logon", "10.30.0.0/24", 2),
+        ("corp-employee", "10.40.1.0/24", 3),
+    ]
+
+
+def test_load_role_network_definitions_skips_guide_sheet_when_role_networks_is_second(tmp_path):
+    path = tmp_path / "role_networks.xlsx"
+    _write_multi_sheet_workbook(
+        path,
+        [
+            ("작성가이드", [["이 시트는 설명용입니다."], ["Role 이름", "네트워크 대역"], ["wrong", "192.0.2.0/24"]]),
+            (
+                "Role_Networks",
+                [
+                    ["Role 이름", "네트워크 대역"],
+                    ["corp-employee", "10.40.1.0/24"],
+                ],
+            ),
+        ],
+    )
+
+    summary = load_role_network_definitions_with_summary(path)
+
+    assert summary.sheet_name == "Role_Networks"
+    assert summary.sheet_fallback_used is False
+    assert [(item.role, item.network) for item in summary.definitions] == [
+        ("corp-employee", "10.40.1.0/24"),
+    ]
+
+
+def test_load_role_network_definitions_falls_back_to_first_sheet_without_role_networks(tmp_path):
+    path = tmp_path / "role_networks.xlsx"
+    _write_multi_sheet_workbook(
+        path,
+        [
+            (
+                "사내대역",
+                [
+                    ["Role 이름", "네트워크 대역"],
+                    ["guest-logon", "10.30.0.0/24"],
+                ],
+            ),
+            ("작성가이드", [["이 시트는 설명용입니다."]]),
+        ],
+    )
+
+    summary = load_role_network_definitions_with_summary(path)
+
+    assert summary.sheet_name == "사내대역"
+    assert summary.sheet_fallback_used is True
+    assert summary.sheet_notice == ROLE_NETWORKS_FALLBACK_NOTICE
+    assert [(item.role, item.network) for item in summary.definitions] == [("guest-logon", "10.30.0.0/24")]
 
 
 def test_load_role_network_definitions_rejects_invalid_rows(tmp_path):
@@ -160,4 +245,14 @@ def _write_workbook(path: Path, rows: list[list[str]]) -> None:
     worksheet = workbook.active
     for row in rows:
         worksheet.append(row)
+    workbook.save(path)
+
+
+def _write_multi_sheet_workbook(path: Path, sheets: list[tuple[str, list[list[str]]]]) -> None:
+    workbook = Workbook()
+    workbook.remove(workbook.active)
+    for title, rows in sheets:
+        worksheet = workbook.create_sheet(title)
+        for row in rows:
+            worksheet.append(row)
     workbook.save(path)

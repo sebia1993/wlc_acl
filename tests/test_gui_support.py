@@ -18,6 +18,7 @@ from wlc_role_acl_collector.gui_app import (
     ROLE_NETWORK_TEMPLATE_LABEL,
     _find_role_network_template,
     _role_network_template_candidates,
+    _role_networks_status_message,
     STAGE_LABELS,
     STAGE_PROGRESS,
     WLC_IP_LABEL,
@@ -37,6 +38,7 @@ from wlc_role_acl_collector.gui_support import (
 )
 from wlc_role_acl_collector.models import CollectionResult, CommandOutput
 from wlc_role_acl_collector.report import write_raw_result
+from wlc_role_acl_collector.role_networks import ROLE_NETWORKS_FALLBACK_NOTICE, RoleNetworkLoadSummary
 
 
 def test_gui_app_importable():
@@ -96,6 +98,8 @@ def test_gui_role_network_copy_explains_internal_report_behavior():
     assert "내부용 HTML/Excel 보고서" in ROLE_NETWORK_HELP
     assert ".xlsx/.xlsm" in ROLE_NETWORK_EMPTY_STATUS
     assert "필수 컬럼" in ROLE_NETWORK_GUIDE_TEXT
+    assert "Sheet 선택 기준" in ROLE_NETWORK_GUIDE_TEXT
+    assert "Role_Networks Sheet가 있으면" in ROLE_NETWORK_GUIDE_TEXT
     assert "10.40.1.0/24" in ROLE_NETWORK_GUIDE_TEXT
     assert "같은 Role에 여러 대역" in ROLE_NETWORK_GUIDE_TEXT
     assert "내부망 전용 보고서" in ROLE_NETWORK_GUIDE_TEXT
@@ -108,6 +112,25 @@ def test_gui_can_find_packaged_role_network_template():
     assert any(path.name == "role_networks.example.xlsx" for path in candidates)
     assert template is not None
     assert template.name == "role_networks.example.xlsx"
+
+
+def test_gui_role_network_status_includes_selected_sheet_and_fallback_notice():
+    summary = RoleNetworkLoadSummary(
+        definitions=[],
+        role_count=1,
+        network_count=2,
+        duplicate_count=1,
+        source_file="role_networks.xlsx",
+        sheet_name="사내대역",
+        sheet_fallback_used=True,
+        sheet_notice=ROLE_NETWORKS_FALLBACK_NOTICE,
+    )
+
+    message = _role_networks_status_message(summary)
+
+    assert "Role 1개 / 대역 2개 / 중복 1행 제외 / Sheet: 사내대역" in message
+    assert ROLE_NETWORKS_FALLBACK_NOTICE in message
+    assert "내부용 보고서" in message
 
 
 def test_log_tag_for_line_classifies_operational_log_levels():

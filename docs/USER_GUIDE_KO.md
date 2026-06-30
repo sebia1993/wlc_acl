@@ -37,7 +37,7 @@
 - 이 프로그램은 Mobility Master(MM)가 아니라 실제 WLC 컨트롤러에 접속해야 합니다.
 - MM IP를 입력하면 Role/ACL 수집 결과가 누락되거나 장비 명령 결과가 예상과 다를 수 있습니다.
 
-사내 Role 대역표를 사용할 경우 첫 번째 시트에 아래 컬럼이 있어야 합니다. `네트워크 대역`은 CIDR 형식(`10.40.1.0/24`)을 권장합니다.
+사내 Role 대역표를 사용할 경우 `Role_Networks` Sheet에 아래 컬럼이 있어야 합니다. 프로그램은 `Role_Networks` Sheet가 있으면 Sheet 순서와 관계없이 그 Sheet를 우선 읽습니다. `Role_Networks` Sheet가 없을 때만 기존 호환성을 위해 첫 번째 Sheet를 읽고 화면에 fallback 안내를 표시합니다. `네트워크 대역`은 CIDR 형식(`10.40.1.0/24`)을 권장합니다.
 
 | 컬럼 | 예시 |
 | --- | --- |
@@ -53,7 +53,7 @@
 
 Excel 파일은 실제 `.xlsx` 또는 `.xlsm` 형식이어야 합니다. CSV나 구형 `.xls` 파일의 확장자만 `.xlsx`로 바꾸면 열 수 없습니다.
 
-GUI의 `작성법` 버튼을 누르면 앱 내부 팝업으로 작성 규칙과 예시를 확인할 수 있습니다. `샘플 열기` 버튼을 누르면 제공된 `config\role_networks.example.xlsx`가 열립니다. 샘플 파일에는 실제 입력용 `Role_Networks` 시트와 설명용 `작성가이드` 시트가 있습니다. 프로그램은 첫 번째 시트인 `Role_Networks`만 읽습니다.
+GUI의 `작성법` 버튼을 누르면 앱 내부 팝업으로 작성 규칙과 예시를 확인할 수 있습니다. `샘플 열기` 버튼을 누르면 제공된 `config\role_networks.example.xlsx`가 열립니다. 샘플 파일에는 실제 입력용 `Role_Networks` 시트와 설명용 `작성가이드` 시트가 있습니다. `작성가이드` 같은 안내 Sheet가 첫 번째에 있어도 `Role_Networks` Sheet가 있으면 안내 Sheet는 읽지 않습니다.
 
 ## 4. Windows GUI 실행 방법
 
@@ -228,8 +228,14 @@ GUI 기본 동작:
 
 | 시트 | 용도 |
 | --- | --- |
-| Role_Networks | 실제 프로그램이 읽는 입력 시트 |
-| 작성가이드 | 작성 규칙, 예시, 주의사항 안내 시트 |
+| Role_Networks | 실제 프로그램이 우선 읽는 입력 시트. Sheet 순서와 관계없이 이 이름을 먼저 찾음 |
+| 작성가이드 | 작성 규칙, 예시, 주의사항 안내 시트. Role_Networks Sheet가 있으면 읽지 않음 |
+
+Sheet 선택 기준:
+
+- `Role_Networks` Sheet가 있으면 Sheet 순서와 관계없이 그 Sheet를 우선 읽습니다.
+- `Role_Networks` Sheet가 없으면 기존 호환성을 위해 첫 번째 Sheet를 읽습니다.
+- fallback이 발생하면 화면 상태 메시지에 `Role_Networks Sheet가 없어 첫 번째 Sheet를 읽었다.`가 표시됩니다.
 
 CLI는 기본적으로 대역표를 보고서에 내보내지 않습니다. CLI에서 내부 보관용 보고서에 Role network를 포함해야 하는 경우에만 아래 옵션을 사용합니다.
 

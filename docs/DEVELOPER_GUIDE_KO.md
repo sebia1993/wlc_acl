@@ -249,7 +249,7 @@ Service 미선택 동작:
 
 사용자가 선택한 Role network Excel을 읽고 검증합니다.
 
-프로그램은 첫 번째 시트만 읽습니다. 샘플 Excel에는 `Role_Networks` 입력 시트와 `작성가이드` 설명 시트가 있지만, 로더는 `Role_Networks`만 사용하므로 설명 시트는 파싱 결과에 영향을 주지 않습니다.
+프로그램은 `Role_Networks` Sheet가 있으면 Sheet 순서와 관계없이 그 Sheet를 우선 읽습니다. `Role_Networks` Sheet가 없을 때만 기존 호환성을 위해 첫 번째 Sheet를 fallback으로 읽습니다. fallback이 발생하면 `RoleNetworkLoadSummary.sheet_fallback_used`가 `True`가 되고, `sheet_notice`에 `Role_Networks Sheet가 없어 첫 번째 Sheet를 읽었다.`가 들어가 GUI 상태 메시지에 표시됩니다. 샘플 Excel에는 `Role_Networks` 입력 시트와 `작성가이드` 설명 시트가 있으며, `Role_Networks` Sheet가 있으면 설명 시트는 파싱 결과에 영향을 주지 않습니다.
 
 기본 정책:
 

@@ -38,7 +38,7 @@ GUI 입력 항목:
 - 고급 옵션의 사내 Role 대역표: 선택 사항입니다. `Role 이름`, `네트워크 대역` 컬럼을 가진 Excel 파일을 넣으면 내부용 HTML/Excel 보고서에 로컬 기준 Role 대역과 WLC 추정값 비교 결과가 표시됩니다. CIDR(`10.40.1.0/24`) 입력을 권장하며, CIDR을 쓰지 않을 때만 `서브넷마스크` 컬럼이 필요합니다.
 - 고급 옵션의 Timeout seconds
 
-사내 Role 대역표는 실제 Excel 통합 문서 형식(`.xlsx` 또는 `.xlsm`)이어야 합니다. CSV, HTML, 구형 `.xls` 파일의 확장자만 `.xlsx`로 바꾸면 열 수 없습니다. GUI의 `작성법` 버튼에서 앱 내부 작성 가이드를 볼 수 있고, `샘플 열기` 버튼으로 제공된 `config\role_networks.example.xlsx`를 열 수 있습니다. 샘플 파일의 `Role_Networks` 시트를 복사/수정해서 사용하고, `작성가이드` 시트에서 예시와 주의사항을 확인하세요.
+사내 Role 대역표는 실제 Excel 통합 문서 형식(`.xlsx` 또는 `.xlsm`)이어야 합니다. CSV, HTML, 구형 `.xls` 파일의 확장자만 `.xlsx`로 바꾸면 열 수 없습니다. GUI의 `작성법` 버튼에서 앱 내부 작성 가이드를 볼 수 있고, `샘플 열기` 버튼으로 제공된 `config\role_networks.example.xlsx`를 열 수 있습니다. 샘플 파일의 `Role_Networks` 시트를 복사/수정해서 사용하고, `작성가이드` 시트에서 예시와 주의사항을 확인하세요. 프로그램은 `Role_Networks` Sheet가 있으면 Sheet 순서와 관계없이 그 Sheet를 우선 읽고, 없을 때만 첫 번째 Sheet를 읽으며 화면에 fallback 안내를 표시합니다.
 
 기본 화면은 `접속 정보 입력 → 수집 시작 → 결과 확인` 순서입니다. 사내 Role 대역표, Timeout seconds, 안전 진단은 `고급 옵션 표시`를 눌렀을 때 나타납니다.
 

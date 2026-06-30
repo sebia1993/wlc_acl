@@ -29,8 +29,13 @@ class RoleNetworkLoadSummary:
     network_count: int
     duplicate_count: int
     source_file: str
+    sheet_name: str = ""
+    sheet_fallback_used: bool = False
+    sheet_notice: str = ""
 
 
+ROLE_NETWORKS_SHEET_NAME = "Role_Networks"
+ROLE_NETWORKS_FALLBACK_NOTICE = "Role_Networks Sheet가 없어 첫 번째 Sheet를 읽었다."
 _EXCEL_FORMAT_HINT = (
     "Use config\\role_networks.example.xlsx as the template, edit only the rows, "
     "then save it as Excel Workbook (*.xlsx). Do not rename a CSV, HTML, or .xls file to .xlsx."
@@ -92,7 +97,8 @@ def load_role_network_definitions_with_summary(path: Path | str | None) -> RoleN
         ) from exc
 
     try:
-        worksheet = workbook.worksheets[0]
+        worksheet, fallback_used = _select_role_network_worksheet(workbook)
+        sheet_name = worksheet.title
         rows = list(worksheet.iter_rows(values_only=True))
     finally:
         workbook.close()
@@ -155,7 +161,16 @@ def load_role_network_definitions_with_summary(path: Path | str | None) -> RoleN
         network_count=len(definitions),
         duplicate_count=duplicate_count,
         source_file=str(source),
+        sheet_name=sheet_name,
+        sheet_fallback_used=fallback_used,
+        sheet_notice=ROLE_NETWORKS_FALLBACK_NOTICE if fallback_used else "",
     )
+
+
+def _select_role_network_worksheet(workbook) -> tuple[Any, bool]:
+    if ROLE_NETWORKS_SHEET_NAME in workbook.sheetnames:
+        return workbook[ROLE_NETWORKS_SHEET_NAME], False
+    return workbook.worksheets[0], True
 
 
 def _validate_excel_file(source: Path) -> None:

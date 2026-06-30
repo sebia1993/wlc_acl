@@ -118,7 +118,16 @@ def test_github_actions_split_pr_validation_and_release():
     assert "- SHA256 체크섬: $checksum" in release_workflow
     assert "- 실행한 검증 명령:" in release_workflow
     assert "## 다운로드 안내" in release_workflow
-    assert "## 변경 커밋 목록" in release_workflow
+    assert "## 주요 변경 사항" in release_workflow
+    assert "$changeSummaryText" in release_workflow
+    assert "## 변경 영역" in release_workflow
+    assert "$areaText" in release_workflow
+    assert "## 변경 파일" in release_workflow
+    assert "$changedFileText" in release_workflow
+    assert "## 원본 커밋 목록" in release_workflow
+    assert "git diff --name-only" in release_workflow
+    assert "배포 자동화: GitHub Actions 검증, 빌드, Release 생성 흐름" in release_workflow
+    assert "GUI: 화면 구성, 진행 상태, 사용자 알림 또는 수집 동작" in release_workflow
     assert "Release metadata" not in release_workflow
     assert "Changed commits" not in release_workflow
 

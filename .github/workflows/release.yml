@@ -110,6 +110,73 @@ jobs:
           $before = "${{ github.event.before }}"
 
           if ($before -and $before -notmatch "^0+$") {
+            $range = "$before..$sha"
+            $commitHashes = git log --format="%H" $range
+            $changedFiles = git diff --name-only $range
+          } else {
+            $range = ""
+            $commitHashes = git log --format="%H" -n 20 $sha
+            $changedFiles = git show --pretty="" --name-only $sha
+          }
+
+          $changeSummary = New-Object System.Collections.Generic.List[string]
+          foreach ($commitHash in $commitHashes) {
+            if (-not $commitHash) {
+              continue
+            }
+            $shortHash = git rev-parse --short $commitHash
+            $subject = git log -1 --pretty=format:"%s" $commitHash
+            $body = git log -1 --pretty=format:"%b" $commitHash
+            $changeSummary.Add("- $subject ($shortHash)")
+            foreach ($line in ($body -split "`r?`n")) {
+              $trimmed = $line.Trim()
+              if ($trimmed) {
+                $changeSummary.Add("  - $trimmed")
+              }
+            }
+          }
+          if ($changeSummary.Count -eq 0) {
+            $changeSummary.Add("- 변경 요약을 자동으로 찾지 못했습니다. 아래 원본 커밋 목록을 확인하세요.")
+          }
+          $changeSummaryText = $changeSummary -join [Environment]::NewLine
+
+          $areas = New-Object System.Collections.Generic.List[string]
+          function Add-ReleaseArea([string] $text) {
+            if (-not $script:areas.Contains($text)) {
+              $script:areas.Add($text)
+            }
+          }
+          foreach ($file in $changedFiles) {
+            if ($file -like ".github/workflows/*") {
+              Add-ReleaseArea "- 배포 자동화: GitHub Actions 검증, 빌드, Release 생성 흐름이 변경되었습니다."
+            } elseif ($file -eq "src/wlc_role_acl_collector/gui_app.py") {
+              Add-ReleaseArea "- GUI: 화면 구성, 진행 상태, 사용자 알림 또는 수집 동작이 변경되었습니다."
+            } elseif ($file -eq "src/wlc_role_acl_collector/report.py") {
+              Add-ReleaseArea "- 보고서: HTML/Excel 보고서 생성 로직이 변경되었습니다."
+            } elseif ($file -eq "src/wlc_role_acl_collector/role_networks.py") {
+              Add-ReleaseArea "- Role 대역표: Excel 입력 파일 처리 로직이 변경되었습니다."
+            } elseif ($file -like "tests/*") {
+              Add-ReleaseArea "- 검증: 테스트 코드가 추가 또는 수정되었습니다."
+            } elseif ($file -like "docs/*") {
+              Add-ReleaseArea "- 문서: 사용자 문서 또는 기획 자료가 변경되었습니다."
+            } elseif ($file -like "config/*") {
+              Add-ReleaseArea "- 설정/샘플: 배포에 포함되는 설정 또는 샘플 파일이 변경되었습니다."
+            } elseif ($file -like "*.ps1" -or $file -like "tools/*") {
+              Add-ReleaseArea "- 빌드/도구: Windows 빌드 또는 검증 스크립트가 변경되었습니다."
+            }
+          }
+          if ($areas.Count -eq 0) {
+            Add-ReleaseArea "- 기타: 소스, 설정, 문서 중 하나 이상이 변경되었습니다."
+          }
+          $areaText = $areas -join [Environment]::NewLine
+
+          $changedFileLines = @($changedFiles | Where-Object { $_ } | ForEach-Object { "- $_" })
+          if (-not $changedFileLines) {
+            $changedFileLines = @("- 변경 파일을 자동으로 찾지 못했습니다.")
+          }
+          $changedFileText = $changedFileLines -join [Environment]::NewLine
+
+          if ($before -and $before -notmatch "^0+$") {
             $commitLines = git log --pretty=format:"- %h %s" "$before..$sha"
           } else {
             $commitLines = git log --pretty=format:"- %h %s" -n 20 $sha
@@ -136,7 +203,16 @@ jobs:
           - ZIP 파일과 .sha256 파일을 함께 다운로드해서 파일 무결성을 확인하세요.
           - Windows PC에서 ZIP 압축을 푼 뒤 GUI 실행 파일을 실행하세요.
 
-          ## 변경 커밋 목록
+          ## 주요 변경 사항
+          $changeSummaryText
+
+          ## 변경 영역
+          $areaText
+
+          ## 변경 파일
+          $changedFileText
+
+          ## 원본 커밋 목록
           $commitText
           "@
           $notes = $notes -replace "(?m)^          ", ""

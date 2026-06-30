@@ -110,6 +110,17 @@ def test_github_actions_split_pr_validation_and_release():
     assert "--draft=false" in release_workflow
     assert "--cleanup-tag" in release_workflow
     assert 'git push origin ":refs/tags/$tag"' in release_workflow
+    assert "이 릴리즈는 main 브랜치에 반영된 변경 사항을 기준으로" in release_workflow
+    assert "## 배포 정보" in release_workflow
+    assert "- 기준 커밋 SHA: $sha" in release_workflow
+    assert "- 브랜치명: $branch" in release_workflow
+    assert "- 산출물 파일명: $assetName" in release_workflow
+    assert "- SHA256 체크섬: $checksum" in release_workflow
+    assert "- 실행한 검증 명령:" in release_workflow
+    assert "## 다운로드 안내" in release_workflow
+    assert "## 변경 커밋 목록" in release_workflow
+    assert "Release metadata" not in release_workflow
+    assert "Changed commits" not in release_workflow
 
 
 def test_runtime_dependencies_include_customtkinter():

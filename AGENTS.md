@@ -61,6 +61,12 @@ a Windows machine.
 - Check `RELEASE_NOTES.md` and `CHANGELOG.md` before GitHub Release work.
 - Distinguish implemented features from planned or excluded features.
 - Do not document features that are not present in the code.
+- Write README procedures as beginner-friendly step-by-step instructions,
+  assuming the reader may not be familiar with GitHub or the development
+  environment.
+- For Windows executable projects, do not imply that macOS can directly produce
+  the final Windows EXE. State that Windows EXE packaging must be verified on a
+  Windows PC or GitHub Actions Windows runner.
 - Do not include internal IP addresses, real device names, credentials, raw
   command output, internal network details, customer names, or generated private
   reports in documentation.

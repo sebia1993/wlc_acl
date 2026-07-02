@@ -106,6 +106,8 @@ def test_release_documentation_describes_current_package_contract():
     assert "macOS" in readme and "Windows EXE" in readme
     assert "코드서명, installer, MSIX, SmartScreen" in changelog
     assert "README.md`, `RELEASE_NOTES.md`, and `CHANGELOG.md`" in agents
+    assert "beginner-friendly step-by-step instructions" in agents
+    assert "GitHub Actions Windows runner" in agents
 
 
 def test_generate_doc_html_outputs_browser_files(tmp_path):

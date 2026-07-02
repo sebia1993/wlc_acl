@@ -88,6 +88,26 @@ def test_verify_release_package_checks_zip_contents_and_checksum(tmp_path):
     )
 
 
+def test_release_documentation_describes_current_package_contract():
+    repo_root = Path(__file__).parents[1]
+    readme = (repo_root / "README.md").read_text(encoding="utf-8")
+    release_notes = (repo_root / "RELEASE_NOTES.md").read_text(encoding="utf-8")
+    changelog = (repo_root / "CHANGELOG.md").read_text(encoding="utf-8")
+    agents = (repo_root / "AGENTS.md").read_text(encoding="utf-8")
+
+    for text in (readme, release_notes):
+        assert "wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_windows.zip" in text
+        assert "wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_windows.zip.sha256" in text
+        assert "WlcRoleAclCollectorGUI.exe" in text
+        assert "WlcRoleAclCollectorCLI.exe" in text
+        assert "config/mock_scenarios" in text or "config\\mock_scenarios" in text
+
+    assert "python .\\tools\\verify_release_package.py --dist .\\dist --smoke-cli" in readme
+    assert "macOS" in readme and "Windows EXE" in readme
+    assert "코드서명, installer, MSIX, SmartScreen" in changelog
+    assert "README.md`, `RELEASE_NOTES.md`, and `CHANGELOG.md`" in agents
+
+
 def test_generate_doc_html_outputs_browser_files(tmp_path):
     repo_root = Path(__file__).parents[1]
     script = repo_root / "tools" / "generate_doc_html.py"

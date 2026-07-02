@@ -25,6 +25,9 @@ mock scenarios, redaction helpers, reports, and Windows packaging support.
   explicitly asks for that exact operation.
 - Keep generated reports, logs, build folders, dist folders, release artifacts,
   and local inventories out of Git.
+- Before pushing to GitHub, opening a PR, or preparing a Release, check whether
+  `README.md`, `RELEASE_NOTES.md`, and `CHANGELOG.md` still match the current
+  code, folder structure, build scripts, Release assets, and known limitations.
 
 ## Important Areas
 
@@ -48,6 +51,22 @@ powershell -ExecutionPolicy Bypass -File .\tools\validate.ps1
 
 For GUI or packaging changes, verify the Windows executable build separately on
 a Windows machine.
+
+## Documentation Rules
+
+- When adding, changing, or removing functionality, decide whether `README.md`
+  also needs to change.
+- Update `README.md` whenever installation, execution, build, usage, Release
+  file names, executable names, folder structure, or requirements change.
+- Check `RELEASE_NOTES.md` and `CHANGELOG.md` before GitHub Release work.
+- Distinguish implemented features from planned or excluded features.
+- Do not document features that are not present in the code.
+- Do not include internal IP addresses, real device names, credentials, raw
+  command output, internal network details, customer names, or generated private
+  reports in documentation.
+- Use sample values such as `192.0.2.10`, `10.10.10.0/24`, and
+  `sample_controller`.
+- If documentation does not need to change, state why in the final report.
 
 ## Safety Rules
 

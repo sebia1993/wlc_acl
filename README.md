@@ -10,20 +10,62 @@ Aruba AOS8 WLC에 접속해 SSID별 기본 Role과 Role별 ACL 접근 범위를 
 - ACL에 `alias <이름>`이 있으면 netdestination 내용을 함께 정리합니다.
 - ClearPass/RADIUS 동적 Role은 직접 수집하지 않고, 동적 Role 가능성으로 표시합니다.
 
+## 현재 구현 범위
+
+구현된 기능:
+
+- Windows GUI 실행 파일과 CLI 실행 파일 배포
+- Aruba AOS8 WLC 접속 후 SSID, Role, ACL, Alias, VLAN/사용자 관측 정보 수집
+- Excel/HTML 보고서 생성
+- HTML 보고서 안의 Role별 ACL 보기, 주석 저장, Access Check
+- 사내 Role 대역 Excel(`Role_Networks` Sheet 우선) 입력과 내부용 비교 보고서
+- 안전 진단 모드와 민감정보 마스킹된 진단 보고서
+- fixture/offline/mock 기반 검증과 GitHub Actions Windows Release 검증
+
+아직 포함하지 않는 기능:
+
+- 코드서명, installer, MSIX, SmartScreen 평판 대응
+- ClearPass/RADIUS 서버에서 동적 Role을 직접 조회하는 기능
+- TCP/UDP 포트 번호까지 service object를 정밀 해석하는 기능
+- macOS에서 Windows EXE를 직접 생성하는 공식 빌드 경로
+
 ## Windows GUI 실행
 
 일반 사용자는 GUI 실행을 권장합니다.
+
+### Release ZIP로 실행
+
+GitHub Release에서 Windows 배포 파일을 받는 방식이 일반 사용자용 경로입니다.
+
+1. GitHub Releases에서 아래 두 파일을 다운로드합니다.
+   - `wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_windows.zip`
+   - `wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_windows.zip.sha256`
+2. Windows PC에서 ZIP 압축을 풉니다.
+3. 압축을 푼 폴더에서 `WlcRoleAclCollectorGUI.exe`를 실행합니다.
+4. CLI가 필요하면 같은 폴더의 `WlcRoleAclCollectorCLI.exe`를 사용합니다.
+
+Release ZIP 안에는 아래 파일이 포함됩니다.
+
+- `WlcRoleAclCollectorGUI.exe`
+- `WlcRoleAclCollectorCLI.exe`
+- `USER_GUIDE_KO.md`, `USER_GUIDE_KO.html`
+- `DEVELOPER_GUIDE_KO.md`, `DEVELOPER_GUIDE_KO.html`
+- `ERROR_CODES_KO.md`, `ERROR_CODES_KO.html`
+- `DIAGNOSTIC_MODE_KO.md`, `DIAGNOSTIC_MODE_KO.html`
+- `SECURITY_MODEL_KO.md`, `SECURITY_MODEL_KO.html`
+- `config\role_networks.example.xlsx`
+- `config\mock_scenarios\*.json`
+
+ZIP 파일과 `.sha256` 파일은 배포용 산출물입니다. 저장소에 커밋하지 않습니다.
+
+### Python 소스에서 실행
+
+개발 PC에서 소스 코드로 실행하려면 Python 3.11 이상이 필요합니다.
 
 ```powershell
 cd "D:\Codex Project\Network\wlc_role_acl_collector"
 python -m pip install -e .
 python -m wlc_role_acl_collector.gui_app
-```
-
-배포본을 사용하는 경우 아래 파일을 실행하면 됩니다.
-
-```text
-dist\WlcRoleAclCollectorGUI.exe
 ```
 
 GUI 입력 항목:
@@ -67,7 +109,9 @@ ACL에 `alias <이름>`이 있으면 자동으로 `show netdestination <이름>`
 
 ## Windows EXE 만들기
 
-Python이 없는 사용자에게 배포할 때 단일 EXE와 ZIP을 생성합니다.
+Python이 없는 사용자에게 배포할 때 Windows 단일 EXE와 ZIP을 생성합니다.
+
+이 작업은 Windows PC 또는 GitHub Actions의 `windows-latest` runner에서 검증합니다. macOS 개발 PC에서는 소스 코드 수정, 테스트, 문서 검증을 수행하고, Windows EXE 최종 검증은 GitHub Actions 또는 Windows PC에서 확인합니다.
 
 ```powershell
 cd "D:\Codex Project\Network\wlc_role_acl_collector"
@@ -77,9 +121,33 @@ cd "D:\Codex Project\Network\wlc_role_acl_collector"
 결과:
 
 - `dist\WlcRoleAclCollectorGUI.exe`
+- `dist\WlcRoleAclCollectorCLI.exe`
 - `dist\WlcRoleAclCollectorGUI_v0.1.0.zip`
 
-ZIP 배포본에는 `config\role_networks.example.xlsx` 샘플 템플릿이 함께 포함됩니다.
+로컬 빌드 ZIP에는 GUI/CLI exe, 한국어 문서, `config\role_networks.example.xlsx`, `config\mock_scenarios`가 포함됩니다. GitHub Release에서는 이 ZIP을 아래 이름으로 복사하고 SHA256 파일을 함께 업로드합니다.
+
+```text
+wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_windows.zip
+wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_windows.zip.sha256
+```
+
+배포 ZIP 구조와 checksum은 다음 스크립트로 검증합니다.
+
+```powershell
+python .\tools\verify_release_package.py --dist .\dist --smoke-cli
+```
+
+`--smoke-cli`는 Windows에서 ZIP을 풀고 `WlcRoleAclCollectorCLI.exe --help`를 실행합니다. Windows가 아닌 환경에서는 CLI smoke 실행을 건너뛰고 ZIP 구조 검증만 수행합니다.
+
+## GitHub Release 자동 배포
+
+- PR 단계: `pull_request` to `main`에서 테스트, Windows 빌드, ZIP 구조 검증을 수행합니다. Release는 만들지 않습니다.
+- main push 단계: `push` to `main`에서 테스트, Windows 빌드, ZIP 검증, SHA256 생성, KST 기준 tag 생성, 공개 GitHub Release 생성을 수행합니다.
+- 자동 tag 형식은 `vYYYY.MM.DD-HHMMSS`입니다. 같은 초에 tag가 이미 있으면 suffix를 붙입니다.
+- Release title은 `wlc-role-acl-collector <tag>` 형식입니다.
+- Release notes는 GitHub Actions에서 한국어로 생성되며 변경 커밋, 기준 SHA, 브랜치명, 검증 명령, 산출물 파일명, SHA256 checksum을 포함합니다.
+
+Release 준비 전에 `README.md`, `RELEASE_NOTES.md`, `CHANGELOG.md`를 함께 확인합니다. 실제 코드에 없는 기능, 내부 IP, 장비명, 계정, 비밀번호, 실제 로그, 고객 정보는 문서에 넣지 않습니다.
 
 ## CLI 실행
 

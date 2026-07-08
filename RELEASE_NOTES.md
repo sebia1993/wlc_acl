@@ -47,6 +47,24 @@ ZIP 내부에는 아래 파일이 포함되어야 합니다.
 
 ZIP과 `.sha256` 파일은 Release asset입니다. 저장소에는 커밋하지 않습니다.
 
+## Streamlit 웹앱 배포 파일
+
+Streamlit 웹앱은 Windows EXE ZIP 안에서 실행하는 방식이 아니라 저장소 소스 파일 기준으로 실행합니다. 아래 파일은 저장소에 커밋하고, 사내망 공용 PC에서 `pip install -r requirements.txt` 후 실행합니다.
+
+- `app.py`
+- `requirements.txt`
+- `src/wlc_role_acl_collector/web_logic.py`
+- `src/wlc_role_acl_collector/` 기존 수집/파서/보고서 모듈
+- `config/role_networks.example.xlsx`
+
+사내망 공유 실행 예시는 다음과 같습니다.
+
+```powershell
+streamlit run app.py --server.address 0.0.0.0 --server.port 8763
+```
+
+브라우저 접속 주소 예시는 `http://공용PC_IP:8763`입니다.
+
 ## 검증 기준
 
 Release 전에 다음 검증이 통과해야 합니다.

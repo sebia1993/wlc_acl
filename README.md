@@ -14,6 +14,7 @@ Aruba AOS8 WLC에 접속해 SSID별 기본 Role과 Role별 ACL 접근 범위를 
 
 구현된 기능:
 
+- 사내망 내부 공유용 Streamlit 웹앱 실행
 - Windows GUI 실행 파일과 CLI 실행 파일 배포
 - Aruba AOS8 WLC 접속 후 SSID, Role, ACL, Alias, VLAN/사용자 관측 정보 수집
 - Excel/HTML 보고서 생성
@@ -27,7 +28,73 @@ Aruba AOS8 WLC에 접속해 SSID별 기본 Role과 Role별 ACL 접근 범위를 
 - 코드서명, installer, MSIX, SmartScreen 평판 대응
 - ClearPass/RADIUS 서버에서 동적 Role을 직접 조회하는 기능
 - TCP/UDP 포트 번호까지 service object를 정밀 해석하는 기능
+- Streamlit 웹앱 자체 사용자 계정/권한 관리 기능
 - macOS에서 Windows EXE를 직접 생성하는 공식 빌드 경로
+
+## Streamlit 웹앱 실행
+
+사내망 내부에서 공용 PC 또는 노트북 1대에 실행해 두고, 다른 사용자가 브라우저로 접속하는 방식입니다. 인터넷 공개용으로 설계하지 않았습니다.
+
+### 1. 공용 PC 준비
+
+공용 PC에는 Python 3.11 이상이 필요합니다. PowerShell에서 아래 순서로 실행합니다.
+
+```powershell
+cd "D:\Codex Project\Network\wlc_role_acl_collector"
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+### 2. 공용 PC에서 웹앱 실행
+
+공용 PC 안에서만 테스트할 때는 아래 명령을 사용합니다.
+
+```powershell
+streamlit run app.py
+```
+
+사내망의 다른 PC에서 접속하게 하려면 아래처럼 실행합니다.
+
+```powershell
+streamlit run app.py --server.address 0.0.0.0 --server.port 8763
+```
+
+다른 사용자는 브라우저에서 아래 주소로 접속합니다.
+
+```text
+http://공용PC_IP:8763
+```
+
+Windows 방화벽에서 TCP `8763` 포트 허용이 필요할 수 있습니다. 공용 PC가 꺼지거나 절전모드에 들어가면 접속이 끊기므로, 장시간 사용 시 전원/절전 설정을 확인하세요.
+
+### 3. 웹 화면 사용 순서
+
+1. 브라우저에서 Streamlit 주소에 접속합니다.
+2. WLC IP 또는 Host를 입력합니다.
+3. Protocol, Port, Timeout seconds를 확인합니다.
+4. Username, Password, Enable password를 입력합니다.
+5. 필요하면 사내 Role 대역표 Excel(`.xlsx` 또는 `.xlsm`)을 업로드합니다.
+6. `수집 실행` 버튼을 누릅니다.
+7. 진행 상태와 로그를 확인합니다.
+8. 결과 요약과 SSID/Role 미리보기를 확인합니다.
+9. 필요한 파일을 다운로드합니다.
+
+다운로드 파일:
+
+- `wlc_role_acl_<날짜시간_세션>.xlsx`
+- `wlc_role_acl_<날짜시간_세션>_ssid_role_map.csv`
+- `wlc_role_acl_<날짜시간_세션>.html`
+
+### 4. Streamlit 사용 시 보안 주의사항
+
+- 접속 주소를 아는 사내 사용자는 웹앱에 접근할 수 있습니다.
+- 장비 계정/비밀번호는 코드에 저장하지 말고 실행 화면에서 입력하세요.
+- 서버 PC에서 실제 WLC 접속이 실행되므로, 서버 PC가 WLC에 접근 가능한 네트워크에 있어야 합니다.
+- 업로드한 Role 대역표와 생성된 결과 파일은 서버의 임시 작업 폴더에서 처리한 뒤 다운로드용 bytes만 세션에 보관합니다.
+- 사내 Role 대역표를 업로드하고 보고서 포함 옵션을 켜면 HTML/Excel 결과에 내부 대역 정보가 들어갑니다. 회사 외부 공유 전 반드시 내용을 확인하세요.
+- 인터넷 공개, 사용자별 로그인, 권한 분리, 감사 로그 보관이 필요한 환경에서는 별도 인증/프록시/접근제어 구성이 필요합니다.
 
 ## Windows GUI 실행
 
@@ -239,6 +306,20 @@ git log --oneline -n 5
 ```powershell
 .\tools\validate.ps1
 ```
+
+Streamlit 전환 관련 로컬 검증은 실제 WLC 접속 없이 fixture/offline 테스트로 확인합니다.
+
+```powershell
+python -m pytest tests\test_web_logic.py tests\test_tooling.py -q
+python -m compileall -q app.py src tests tools
+```
+
+브라우저 수동 확인 절차:
+
+1. `streamlit run app.py`를 실행합니다.
+2. 브라우저에 표시된 로컬 주소로 접속합니다.
+3. 입력 폼, Role 대역 Excel 업로드 영역, `수집 실행` 버튼, 진행 상태 영역, 결과 요약/미리보기 영역이 표시되는지 확인합니다.
+4. 실제 WLC 검증은 서버 PC가 사내망에서 장비에 접근 가능한 환경일 때만 수행합니다.
 
 ## Secure Role Network Handling
 

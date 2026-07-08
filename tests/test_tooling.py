@@ -11,7 +11,7 @@ def test_validate_script_runs_local_checks():
     text = script.read_text(encoding="utf-8")
 
     assert "python -m pytest -q" in text
-    assert "python -m compileall -q src" in text
+    assert "python -m compileall -q app.py src tests tools" in text
     assert "node --check" in text
     assert "Node.js was not found. Skipping JavaScript syntax check." in text
 
@@ -90,10 +90,12 @@ def test_verify_release_package_checks_zip_contents_and_checksum(tmp_path):
 
 def test_release_documentation_describes_current_package_contract():
     repo_root = Path(__file__).parents[1]
+    app = (repo_root / "app.py").read_text(encoding="utf-8")
     readme = (repo_root / "README.md").read_text(encoding="utf-8")
     release_notes = (repo_root / "RELEASE_NOTES.md").read_text(encoding="utf-8")
     changelog = (repo_root / "CHANGELOG.md").read_text(encoding="utf-8")
     agents = (repo_root / "AGENTS.md").read_text(encoding="utf-8")
+    requirements = (repo_root / "requirements.txt").read_text(encoding="utf-8")
 
     for text in (readme, release_notes):
         assert "wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_windows.zip" in text
@@ -103,7 +105,16 @@ def test_release_documentation_describes_current_package_contract():
         assert "config/mock_scenarios" in text or "config\\mock_scenarios" in text
 
     assert "python .\\tools\\verify_release_package.py --dist .\\dist --smoke-cli" in readme
+    assert "streamlit run app.py --server.address 0.0.0.0 --server.port 8763" in readme
+    assert "http://공용PC_IP:8763" in readme
+    assert "Windows 방화벽" in readme
+    assert "절전모드" in readme
+    assert "streamlit run app.py --server.address 0.0.0.0 --server.port 8763" in release_notes
+    assert "-e .[web]" in requirements
+    assert "st.file_uploader" in app
+    assert "st.download_button" in app
     assert "macOS" in readme and "Windows EXE" in readme
+    assert "Streamlit 웹앱 자체 사용자 로그인/권한 관리" in changelog
     assert "코드서명, installer, MSIX, SmartScreen" in changelog
     assert "README.md`, `RELEASE_NOTES.md`, and `CHANGELOG.md`" in agents
     assert "beginner-friendly step-by-step instructions" in agents
@@ -205,3 +216,4 @@ def test_runtime_dependencies_include_customtkinter():
     pyproject = (Path(__file__).parents[1] / "pyproject.toml").read_text(encoding="utf-8")
 
     assert '"customtkinter>=5.2"' in pyproject
+    assert '"streamlit>=1.36"' in pyproject

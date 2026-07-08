@@ -20,6 +20,9 @@ dev = [
   "pyinstaller>=6.0",
   "pytest>=8.0",
 ]
+web = [
+  "streamlit>=1.36",
+]
 
 [project.scripts]
 wlc-role-acl-collector = "wlc_role_acl_collector.cli:main"

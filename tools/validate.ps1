@@ -19,7 +19,7 @@ try {
     python -m pytest -q
 
     Write-Host "[2/3] compileall"
-    python -m compileall -q src
+    python -m compileall -q app.py src tests tools
 
     Write-Host "[3/3] Access Check JavaScript syntax"
     $node = Get-Command node -ErrorAction SilentlyContinue

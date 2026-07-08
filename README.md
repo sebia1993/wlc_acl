@@ -35,9 +35,47 @@ Aruba AOS8 WLC에 접속해 SSID별 기본 Role과 Role별 ACL 접근 범위를 
 
 사내망 내부에서 공용 PC 또는 노트북 1대에 실행해 두고, 다른 사용자가 브라우저로 접속하는 방식입니다. 인터넷 공개용으로 설계하지 않았습니다.
 
-### 1. 공용 PC 준비
+### 1. Release portable ZIP로 실행
 
-공용 PC에는 Python 3.11 이상이 필요합니다. PowerShell에서 아래 순서로 실행합니다.
+일반 사용자는 GitHub Release의 Streamlit portable ZIP을 사용합니다. 이 방식은 Windows PC에 Python을 별도로 설치하지 않습니다.
+
+1. GitHub Releases에서 아래 두 파일을 다운로드합니다.
+   - `wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_streamlit_windows_portable.zip`
+   - `wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_streamlit_windows_portable.zip.sha256`
+2. Windows PC에서 ZIP 압축을 풉니다.
+3. 압축을 푼 폴더에서 `start_webapp.cmd`를 더블클릭합니다.
+4. 실행 창은 닫지 않습니다. 이 창을 닫으면 웹앱도 종료됩니다.
+
+ZIP 안에는 아래 파일과 폴더가 포함됩니다.
+
+- `start_webapp.cmd`
+- `webapp_settings.cmd`
+- `README_WEBAPP_KO.txt`
+- `python\`
+- `app\app.py`
+- `config\role_networks.example.xlsx`
+
+### 2. 접속 주소와 포트
+
+실행한 PC에서만 접속할 때는 브라우저에서 아래 주소를 엽니다.
+
+```text
+http://127.0.0.1:8763
+```
+
+사내망의 다른 PC에서 접속할 때는 아래 주소를 사용합니다.
+
+```text
+http://공용PC_IP:8763
+```
+
+기본 포트는 `8763`입니다. 포트를 바꾸려면 압축을 푼 폴더의 `webapp_settings.cmd`를 메모장으로 열고 `WLC_WEB_PORT` 값을 변경합니다.
+
+Windows 방화벽에서 TCP `8763` 포트 허용이 필요할 수 있습니다. 공용 PC가 꺼지거나 절전모드에 들어가면 접속이 끊기므로, 장시간 사용 시 전원/절전 설정을 확인하세요.
+
+### 3. 개발 PC에서 소스 실행
+
+소스 코드로 직접 실행할 때만 Python 3.11 이상이 필요합니다.
 
 ```powershell
 cd "D:\Codex Project\Network\wlc_role_acl_collector"
@@ -45,31 +83,10 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
-```
-
-### 2. 공용 PC에서 웹앱 실행
-
-공용 PC 안에서만 테스트할 때는 아래 명령을 사용합니다.
-
-```powershell
-streamlit run app.py
-```
-
-사내망의 다른 PC에서 접속하게 하려면 아래처럼 실행합니다.
-
-```powershell
 streamlit run app.py --server.address 0.0.0.0 --server.port 8763
 ```
 
-다른 사용자는 브라우저에서 아래 주소로 접속합니다.
-
-```text
-http://공용PC_IP:8763
-```
-
-Windows 방화벽에서 TCP `8763` 포트 허용이 필요할 수 있습니다. 공용 PC가 꺼지거나 절전모드에 들어가면 접속이 끊기므로, 장시간 사용 시 전원/절전 설정을 확인하세요.
-
-### 3. 웹 화면 사용 순서
+### 4. 웹 화면 사용 순서
 
 1. 브라우저에서 Streamlit 주소에 접속합니다.
 2. WLC IP 또는 Host를 입력합니다.
@@ -87,7 +104,7 @@ Windows 방화벽에서 TCP `8763` 포트 허용이 필요할 수 있습니다. 
 - `wlc_role_acl_<날짜시간_세션>_ssid_role_map.csv`
 - `wlc_role_acl_<날짜시간_세션>.html`
 
-### 4. Streamlit 사용 시 보안 주의사항
+### 5. Streamlit 사용 시 보안 주의사항
 
 - 접속 주소를 아는 사내 사용자는 웹앱에 접근할 수 있습니다.
 - 장비 계정/비밀번호는 코드에 저장하지 말고 실행 화면에서 입력하세요.
@@ -174,15 +191,16 @@ ACL에 `alias <이름>`이 있으면 자동으로 `show netdestination <이름>`
 
 실패 메시지에는 가능한 경우 실패 명령 ID, 실제 명령어, `run.log` 경로가 함께 표시됩니다.
 
-## Windows EXE 만들기
+## Windows 배포 패키지 만들기
 
-Python이 없는 사용자에게 배포할 때 Windows 단일 EXE와 ZIP을 생성합니다.
+Python이 없는 사용자에게 배포할 때 Windows GUI/CLI EXE ZIP과 Streamlit portable ZIP을 생성합니다.
 
-이 작업은 Windows PC 또는 GitHub Actions의 `windows-latest` runner에서 검증합니다. macOS 개발 PC에서는 소스 코드 수정, 테스트, 문서 검증을 수행하고, Windows EXE 최종 검증은 GitHub Actions 또는 Windows PC에서 확인합니다.
+이 작업은 Windows PC 또는 GitHub Actions의 `windows-latest` runner에서 검증합니다. macOS 개발 PC에서는 소스 코드 수정, 테스트, 문서 검증을 수행하고, Windows 실행/portable 패키지 최종 검증은 GitHub Actions 또는 Windows PC에서 확인합니다.
 
 ```powershell
 cd "D:\Codex Project\Network\wlc_role_acl_collector"
 .\build_windows_gui_exe.ps1
+.\build_windows_streamlit_portable.ps1
 ```
 
 결과:
@@ -190,29 +208,34 @@ cd "D:\Codex Project\Network\wlc_role_acl_collector"
 - `dist\WlcRoleAclCollectorGUI.exe`
 - `dist\WlcRoleAclCollectorCLI.exe`
 - `dist\WlcRoleAclCollectorGUI_v0.1.0.zip`
+- `dist\WlcRoleAclCollectorWeb_v0.1.0.zip`
 
 로컬 빌드 ZIP에는 GUI/CLI exe, 한국어 문서, `config\role_networks.example.xlsx`, `config\mock_scenarios`가 포함됩니다. GitHub Release에서는 이 ZIP을 아래 이름으로 복사하고 SHA256 파일을 함께 업로드합니다.
 
 ```text
 wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_windows.zip
 wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_windows.zip.sha256
+wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_streamlit_windows_portable.zip
+wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_streamlit_windows_portable.zip.sha256
 ```
 
 배포 ZIP 구조와 checksum은 다음 스크립트로 검증합니다.
 
 ```powershell
 python .\tools\verify_release_package.py --dist .\dist --smoke-cli
+python .\tools\verify_streamlit_portable_package.py --dist .\dist --smoke
 ```
 
 `--smoke-cli`는 Windows에서 ZIP을 풀고 `WlcRoleAclCollectorCLI.exe --help`를 실행합니다. Windows가 아닌 환경에서는 CLI smoke 실행을 건너뛰고 ZIP 구조 검증만 수행합니다.
+`--smoke`는 Windows에서 Streamlit portable ZIP을 풀고 `start_webapp.cmd --smoke`로 내장 Python, Streamlit, 앱 모듈 import를 확인합니다.
 
 ## GitHub Release 자동 배포
 
-- PR 단계: `pull_request` to `main`에서 테스트, Windows 빌드, ZIP 구조 검증을 수행합니다. Release는 만들지 않습니다.
-- main push 단계: `push` to `main`에서 테스트, Windows 빌드, ZIP 검증, SHA256 생성, KST 기준 tag 생성, 공개 GitHub Release 생성을 수행합니다.
+- PR 단계: `pull_request` to `main`에서 테스트, Windows GUI/CLI ZIP 빌드, Streamlit portable ZIP 빌드, ZIP 구조 검증을 수행합니다. Release는 만들지 않습니다.
+- main push 단계: `push` to `main`에서 테스트, 두 ZIP 빌드/검증, SHA256 생성, KST 기준 tag 생성, 공개 GitHub Release 생성을 수행합니다.
 - 자동 tag 형식은 `vYYYY.MM.DD-HHMMSS`입니다. 같은 초에 tag가 이미 있으면 suffix를 붙입니다.
 - Release title은 `wlc-role-acl-collector <tag>` 형식입니다.
-- Release notes는 GitHub Actions에서 한국어로 생성되며 변경 커밋, 기준 SHA, 브랜치명, 검증 명령, 산출물 파일명, SHA256 checksum을 포함합니다.
+- Release notes는 GitHub Actions에서 한국어로 생성되며 변경 커밋, 기준 SHA, 브랜치명, 검증 명령, 빌드 명령, 산출물 파일명, SHA256 checksum을 포함합니다.
 
 Release 준비 전에 `README.md`, `RELEASE_NOTES.md`, `CHANGELOG.md`를 함께 확인합니다. 실제 코드에 없는 기능, 내부 IP, 장비명, 계정, 비밀번호, 실제 로그, 고객 정보는 문서에 넣지 않습니다.
 
@@ -312,6 +335,7 @@ Streamlit 전환 관련 로컬 검증은 실제 WLC 접속 없이 fixture/offlin
 ```powershell
 python -m pytest tests\test_web_logic.py tests\test_tooling.py -q
 python -m compileall -q app.py src tests tools
+python .\tools\verify_streamlit_portable_package.py --dist .\dist
 ```
 
 브라우저 수동 확인 절차:

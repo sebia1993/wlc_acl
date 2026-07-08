@@ -39,3 +39,11 @@ jobs:
       - name: Verify package artifact
         shell: pwsh
         run: python .\tools\verify_release_package.py --dist .\dist --smoke-cli
+
+      - name: Build Streamlit portable package
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\build_windows_streamlit_portable.ps1
+
+      - name: Verify Streamlit portable package
+        shell: pwsh
+        run: python .\tools\verify_streamlit_portable_package.py --dist .\dist --smoke

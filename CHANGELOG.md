@@ -7,6 +7,7 @@
 현재 구현된 주요 기능:
 
 - 사내망 내부 공용 PC에서 실행하는 Streamlit 웹앱을 제공합니다.
+- Python 설치가 없는 Windows PC에서도 실행할 수 있도록 Streamlit portable ZIP을 제공합니다.
 - Streamlit 웹앱에서 WLC 접속 정보 입력, Role 대역 Excel 업로드, 진행 상태 표시, 결과 요약, 테이블 미리보기, xlsx/csv/html 다운로드를 제공합니다.
 - Aruba AOS8 WLC에서 SSID, AAA Profile, 기본 Role, Role ACL, Alias 정보를 수집합니다.
 - `show ip interface brief`와 `show user-table`을 이용해 Role 대역 추정 근거와 현재 관측 사용자 정보를 보고서에 표시합니다.
@@ -15,13 +16,15 @@
 - GUI에서 사내 Role 대역 Excel 파일을 선택해 내부용 비교 보고서를 만들 수 있습니다.
 - CLI에서는 `--export-local-role-networks`를 명시한 경우에만 로컬 Role 대역을 보고서에 포함합니다.
 - 안전 진단 모드는 민감정보를 마스킹한 HTML/JSON 진단 보고서를 생성합니다.
-- Windows Release ZIP에는 GUI exe, CLI exe, 한국어 문서, Role 대역 예제 Excel, mock scenario JSON이 포함됩니다.
-- GitHub Actions는 PR에서 테스트/Windows 빌드/ZIP 검증을 수행하고, main push에서 공개 Release와 SHA256 파일을 생성합니다.
+- Windows GUI/CLI Release ZIP에는 GUI exe, CLI exe, 한국어 문서, Role 대역 예제 Excel, mock scenario JSON이 포함됩니다.
+- Windows Streamlit portable Release ZIP에는 내장 Python, 앱 코드, 웹앱 실행 스크립트, Role 대역 예제 Excel이 포함됩니다.
+- GitHub Actions는 PR에서 테스트/Windows 빌드/두 ZIP 검증을 수행하고, main push에서 공개 Release와 SHA256 파일을 생성합니다.
 
 최근 안정성 개선:
 
 - Streamlit 실행마다 날짜시간과 세션 구분값이 포함된 결과 파일명을 사용합니다.
 - Streamlit 업로드 파일과 결과 파일은 서버 임시 작업 폴더에서 처리하고 다운로드 bytes만 세션에 보관합니다.
+- Streamlit portable ZIP 검증에서 내장 Python, Streamlit 패키지, 앱 패키지, `start_webapp.cmd --smoke`, SHA256 sidecar를 확인합니다.
 - collect, diagnose, GUI 수집 결과 폴더가 같은 시간에 생성되어도 충돌하지 않도록 run directory 생성 방식을 개선했습니다.
 - `enable password` 적용 실패를 조용히 무시하지 않고 수집 결과와 진행 이벤트에 기록합니다.
 - Windows 배포 ZIP 검증에서 GUI/CLI exe, 문서, config, mock scenario, CLI `--help`, SHA256 sidecar를 확인합니다.

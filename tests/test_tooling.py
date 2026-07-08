@@ -90,6 +90,34 @@ def test_streamlit_portable_build_contract():
     assert "start_webapp.cmd" in guide
 
 
+def test_combined_release_build_contract():
+    repo_root = Path(__file__).parents[1]
+    build_script = (repo_root / "build_windows_combined_release.ps1").read_text(encoding="utf-8")
+    verifier = (repo_root / "tools" / "verify_combined_release_package.py").read_text(encoding="utf-8")
+    readme = (repo_root / "packaging" / "combined_release" / "README_START_HERE_KO.txt").read_text(
+        encoding="utf-8"
+    )
+
+    assert "WlcRoleAclCollectorGUI_*.zip" in build_script
+    assert "WlcRoleAclCollectorWeb_*.zip" in build_script
+    assert "WlcRoleAclCollectorWindows_v${version}.zip" in build_script
+    assert "README_START_HERE_KO.txt" in build_script
+    assert '"gui"' in build_script
+    assert '"web"' in build_script
+
+    assert "gui/WlcRoleAclCollectorGUI.exe" in verifier
+    assert "gui/WlcRoleAclCollectorCLI.exe" in verifier
+    assert "web/start_webapp.cmd" in verifier
+    assert "web/python/python.exe" in verifier
+    assert "web/python/Lib/site-packages/streamlit/" in verifier
+    assert "web/python/Lib/site-packages/wlc_role_acl_collector/" in verifier
+    assert "--expected-sha256" in verifier
+    assert "STREAMLIT_PORTABLE_OK" in verifier
+    assert "Source code" in readme
+    assert "gui\\WlcRoleAclCollectorGUI.exe" in readme
+    assert "web\\start_webapp.cmd" in readme
+
+
 def test_verify_release_package_checks_zip_contents_and_checksum(tmp_path):
     repo_root = Path(__file__).parents[1]
     script = repo_root / "tools" / "verify_release_package.py"
@@ -157,6 +185,51 @@ def test_verify_streamlit_portable_package_checks_zip_contents_and_checksum(tmp_
     )
 
 
+def test_verify_combined_release_package_checks_zip_contents_and_checksum(tmp_path):
+    repo_root = Path(__file__).parents[1]
+    script = repo_root / "tools" / "verify_combined_release_package.py"
+    zip_path = tmp_path / "WlcRoleAclCollectorWindows_v0.1.0.zip"
+    required_entries = [
+        "README_START_HERE_KO.txt",
+        "gui/WlcRoleAclCollectorGUI.exe",
+        "gui/WlcRoleAclCollectorCLI.exe",
+        "gui/USER_GUIDE_KO.md",
+        "gui/USER_GUIDE_KO.html",
+        "gui/DEVELOPER_GUIDE_KO.md",
+        "gui/DEVELOPER_GUIDE_KO.html",
+        "gui/ERROR_CODES_KO.md",
+        "gui/ERROR_CODES_KO.html",
+        "gui/DIAGNOSTIC_MODE_KO.md",
+        "gui/DIAGNOSTIC_MODE_KO.html",
+        "gui/SECURITY_MODEL_KO.md",
+        "gui/SECURITY_MODEL_KO.html",
+        "gui/config/role_networks.example.xlsx",
+        "gui/config/mock_scenarios/auth_failed.json",
+        "gui/config/mock_scenarios/missing_config.json",
+        "gui/config/mock_scenarios/permission_denied.json",
+        "gui/config/mock_scenarios/success_minimal.json",
+        "web/start_webapp.cmd",
+        "web/webapp_settings.cmd",
+        "web/README_WEBAPP_KO.txt",
+        "web/python/python.exe",
+        "web/python/Lib/site-packages/streamlit/__init__.py",
+        "web/python/Lib/site-packages/wlc_role_acl_collector/__init__.py",
+        "web/app/app.py",
+        "web/config/role_networks.example.xlsx",
+    ]
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        for entry in required_entries:
+            archive.writestr(entry, "fixture")
+
+    digest = hashlib.sha256(zip_path.read_bytes()).hexdigest()
+
+    subprocess.run(
+        [sys.executable, str(script), "--zip", str(zip_path), "--expected-sha256", digest],
+        check=True,
+        cwd=repo_root,
+    )
+
+
 def test_release_documentation_describes_current_package_contract():
     repo_root = Path(__file__).parents[1]
     app = (repo_root / "app.py").read_text(encoding="utf-8")
@@ -168,30 +241,33 @@ def test_release_documentation_describes_current_package_contract():
 
     for text in (readme, release_notes):
         assert "wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_windows.zip" in text
-        assert "wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_windows.zip.sha256" in text
-        assert "wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_streamlit_windows_portable.zip" in text
-        assert "wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_streamlit_windows_portable.zip.sha256" in text
         assert "WlcRoleAclCollectorGUI.exe" in text
         assert "WlcRoleAclCollectorCLI.exe" in text
         assert "start_webapp.cmd" in text
         assert "webapp_settings.cmd" in text
+        assert "README_START_HERE_KO.txt" in text
+        assert "Source code (zip)" in text
         assert "config/mock_scenarios" in text or "config\\mock_scenarios" in text
+        assert "wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_windows.zip.sha256" not in text
+        assert "wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_streamlit_windows_portable.zip" not in text
 
     assert "python .\\tools\\verify_release_package.py --dist .\\dist --smoke-cli" in readme
     assert "python .\\tools\\verify_streamlit_portable_package.py --dist .\\dist --smoke" in readme
+    assert "python .\\tools\\verify_combined_release_package.py --dist .\\dist --smoke" in readme
     assert "streamlit run app.py --server.address 0.0.0.0 --server.port 8763" in readme
     assert "http://공용PC_IP:8763" in readme
     assert "Windows 방화벽" in readme
     assert "절전모드" in readme
     assert "Windows PC에 Python을 별도로 설치하지 않습니다" in readme
-    assert "WlcRoleAclCollectorWeb_v0.1.0.zip" in readme
+    assert "WlcRoleAclCollectorWindows_v0.1.0.zip" in readme
     assert "streamlit run app.py --server.address 0.0.0.0 --server.port 8763" in release_notes
     assert "python .\\tools\\verify_streamlit_portable_package.py --dist .\\dist --smoke" in release_notes
+    assert "python .\\tools\\verify_combined_release_package.py --dist .\\dist --smoke" in release_notes
     assert "-e .[web]" in requirements
     assert "st.file_uploader" in app
     assert "st.download_button" in app
     assert "macOS" in readme and "Windows EXE" in readme
-    assert "Streamlit portable ZIP" in changelog
+    assert "통합 ZIP 하나" in changelog
     assert "Streamlit 웹앱 자체 사용자 로그인/권한 관리" in changelog
     assert "코드서명, installer, MSIX, SmartScreen" in changelog
     assert "README.md`, `RELEASE_NOTES.md`, and `CHANGELOG.md`" in agents
@@ -239,6 +315,8 @@ def test_github_actions_split_pr_validation_and_release():
     build_command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\\build_windows_gui_exe.ps1"
     web_build_command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\\build_windows_streamlit_portable.ps1"
     web_verify_command = "python .\\tools\\verify_streamlit_portable_package.py --dist .\\dist --smoke"
+    combined_build_command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\\build_windows_combined_release.ps1"
+    combined_verify_command = "python .\\tools\\verify_combined_release_package.py --dist .\\dist --smoke"
 
     assert "pull_request:" in pr_workflow
     assert "branches: [main]" in pr_workflow
@@ -247,6 +325,8 @@ def test_github_actions_split_pr_validation_and_release():
     assert "python .\\tools\\verify_release_package.py --dist .\\dist --smoke-cli" in pr_workflow
     assert web_build_command in pr_workflow
     assert web_verify_command in pr_workflow
+    assert combined_build_command in pr_workflow
+    assert combined_verify_command in pr_workflow
     assert "gh release" not in pr_workflow
 
     assert "push:" in release_workflow
@@ -257,12 +337,16 @@ def test_github_actions_split_pr_validation_and_release():
     assert validation_command in release_workflow
     assert build_command in release_workflow
     assert web_build_command in release_workflow
+    assert combined_build_command in release_workflow
     assert "python .\\tools\\verify_release_package.py --dist .\\dist --smoke-cli" in release_workflow
     assert web_verify_command in release_workflow
-    assert "web_asset_name" in release_workflow
-    assert "streamlit_windows_portable.zip" in release_workflow
-    assert "--sha256 \"${{ steps.assets.outputs.checksum_path }}\"" in release_workflow
-    assert "--sha256 \"${{ steps.assets.outputs.web_checksum_path }}\"" in release_workflow
+    assert combined_verify_command in release_workflow
+    assert "WlcRoleAclCollectorWindows_*.zip" in release_workflow
+    assert "web_asset_name" not in release_workflow
+    assert "streamlit_windows_portable.zip" not in release_workflow
+    assert "checksum_path" not in release_workflow
+    assert "web_checksum_path" not in release_workflow
+    assert "web_asset_path" not in release_workflow
     assert "Get-FileHash -Algorithm SHA256" in release_workflow
     assert "git tag" in release_workflow
     assert 'git push origin "refs/tags/' in release_workflow
@@ -284,14 +368,13 @@ def test_github_actions_split_pr_validation_and_release():
     assert "- 실행한 검증 명령: powershell -NoProfile -ExecutionPolicy Bypass -File .\\tools\\validate.ps1" in release_workflow
     assert "- 실행한 빌드 명령: powershell -NoProfile -ExecutionPolicy Bypass -File .\\build_windows_gui_exe.ps1" in release_workflow
     assert "- 실행한 웹앱 빌드 명령: powershell -NoProfile -ExecutionPolicy Bypass -File .\\build_windows_streamlit_portable.ps1" in release_workflow
+    assert "- 실행한 통합 ZIP 빌드 명령: powershell -NoProfile -ExecutionPolicy Bypass -File .\\build_windows_combined_release.ps1" in release_workflow
     assert "- 실행한 웹앱 ZIP 검증 명령: python .\\tools\\verify_streamlit_portable_package.py --dist .\\dist --smoke" in release_workflow
+    assert "- 실행한 통합 ZIP 검증 명령: python .\\tools\\verify_combined_release_package.py --dist .\\dist --smoke" in release_workflow
     assert "## 첨부파일" in release_workflow
-    assert "- Windows GUI/CLI 산출물 파일명: $assetName" in release_workflow
-    assert "- Windows GUI/CLI SHA256 파일명: $assetName.sha256" in release_workflow
-    assert "- Windows GUI/CLI SHA256 체크섬: $checksum" in release_workflow
-    assert "- Streamlit 웹앱 산출물 파일명: $webAssetName" in release_workflow
-    assert "- Streamlit 웹앱 SHA256 파일명: $webAssetName.sha256" in release_workflow
-    assert "- Streamlit 웹앱 SHA256 체크섬: $webChecksum" in release_workflow
+    assert "- 다운로드할 파일: $assetName" in release_workflow
+    assert "- SHA256 체크섬: $checksum" in release_workflow
+    assert "Source code (zip)" in release_workflow
     assert "start_webapp.cmd" in release_workflow
     assert "<details>" in release_workflow
     assert "<summary>세부 커밋 및 변경 파일</summary>" in release_workflow

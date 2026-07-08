@@ -58,11 +58,9 @@ jobs:
           }
 
           $assetName = "${projectName}_${candidate}_windows.zip"
-          $webAssetName = "${projectName}_${candidate}_streamlit_windows_portable.zip"
           "project_name=$projectName" >> $env:GITHUB_OUTPUT
           "tag=$candidate" >> $env:GITHUB_OUTPUT
           "asset_name=$assetName" >> $env:GITHUB_OUTPUT
-          "web_asset_name=$webAssetName" >> $env:GITHUB_OUTPUT
 
       - name: Run validation
         shell: pwsh
@@ -84,6 +82,14 @@ jobs:
         shell: pwsh
         run: python .\tools\verify_streamlit_portable_package.py --dist .\dist --smoke
 
+      - name: Build combined Windows package
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\build_windows_combined_release.ps1
+
+      - name: Verify combined Windows package
+        shell: pwsh
+        run: python .\tools\verify_combined_release_package.py --dist .\dist --smoke
+
       - name: Prepare release assets
         id: assets
         shell: pwsh
@@ -91,55 +97,28 @@ jobs:
           $assetDir = Join-Path $PWD "release_assets"
           New-Item -ItemType Directory -Force -Path $assetDir | Out-Null
 
-          $sourceZip = Get-ChildItem -Path ".\dist" -Filter "WlcRoleAclCollectorGUI_*.zip" |
+          $sourceZip = Get-ChildItem -Path ".\dist" -Filter "WlcRoleAclCollectorWindows_*.zip" |
             Sort-Object LastWriteTime -Descending |
             Select-Object -First 1
           if (-not $sourceZip) {
-            throw "No Windows GUI/CLI release zip was generated in dist."
-          }
-
-          $webSourceZip = Get-ChildItem -Path ".\dist" -Filter "WlcRoleAclCollectorWeb_*.zip" |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
-          if (-not $webSourceZip) {
-            throw "No Streamlit portable release zip was generated in dist."
+            throw "No combined Windows release zip was generated in dist."
           }
 
           $assetName = "${{ steps.metadata.outputs.asset_name }}"
           $assetPath = Join-Path $assetDir $assetName
           Copy-Item -LiteralPath $sourceZip.FullName -Destination $assetPath -Force
 
-          $webAssetName = "${{ steps.metadata.outputs.web_asset_name }}"
-          $webAssetPath = Join-Path $assetDir $webAssetName
-          Copy-Item -LiteralPath $webSourceZip.FullName -Destination $webAssetPath -Force
-
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $assetPath).Hash.ToLowerInvariant()
-          $checksumPath = "$assetPath.sha256"
-          "$hash  $assetName" | Set-Content -LiteralPath $checksumPath -Encoding ASCII
-
-          $webHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $webAssetPath).Hash.ToLowerInvariant()
-          $webChecksumPath = "$webAssetPath.sha256"
-          "$webHash  $webAssetName" | Set-Content -LiteralPath $webChecksumPath -Encoding ASCII
 
           "asset_path=$assetPath" >> $env:GITHUB_OUTPUT
-          "checksum_path=$checksumPath" >> $env:GITHUB_OUTPUT
           "checksum=$hash" >> $env:GITHUB_OUTPUT
-          "checksum_name=$assetName.sha256" >> $env:GITHUB_OUTPUT
-          "web_asset_path=$webAssetPath" >> $env:GITHUB_OUTPUT
-          "web_checksum_path=$webChecksumPath" >> $env:GITHUB_OUTPUT
-          "web_checksum=$webHash" >> $env:GITHUB_OUTPUT
-          "web_checksum_name=$webAssetName.sha256" >> $env:GITHUB_OUTPUT
 
       - name: Verify release assets
         shell: pwsh
         run: |
-          python .\tools\verify_release_package.py `
+          python .\tools\verify_combined_release_package.py `
             --zip "${{ steps.assets.outputs.asset_path }}" `
-            --sha256 "${{ steps.assets.outputs.checksum_path }}" `
-            --smoke-cli
-          python .\tools\verify_streamlit_portable_package.py `
-            --zip "${{ steps.assets.outputs.web_asset_path }}" `
-            --sha256 "${{ steps.assets.outputs.web_checksum_path }}" `
+            --expected-sha256 "${{ steps.assets.outputs.checksum }}" `
             --smoke
 
       - name: Create Korean release notes
@@ -149,9 +128,7 @@ jobs:
           $tag = "${{ steps.metadata.outputs.tag }}"
           $projectName = "${{ steps.metadata.outputs.project_name }}"
           $assetName = "${{ steps.metadata.outputs.asset_name }}"
-          $webAssetName = "${{ steps.metadata.outputs.web_asset_name }}"
           $checksum = "${{ steps.assets.outputs.checksum }}"
-          $webChecksum = "${{ steps.assets.outputs.web_checksum }}"
           $sha = "${{ github.sha }}"
           $branch = "${{ github.ref_name }}"
           $before = "${{ github.event.before }}"
@@ -253,18 +230,17 @@ jobs:
           - 실행한 검증 명령: powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\validate.ps1
           - 실행한 빌드 명령: powershell -NoProfile -ExecutionPolicy Bypass -File .\build_windows_gui_exe.ps1
           - 실행한 웹앱 빌드 명령: powershell -NoProfile -ExecutionPolicy Bypass -File .\build_windows_streamlit_portable.ps1
+          - 실행한 통합 ZIP 빌드 명령: powershell -NoProfile -ExecutionPolicy Bypass -File .\build_windows_combined_release.ps1
           - 실행한 ZIP 검증 명령: python .\tools\verify_release_package.py --dist .\dist --smoke-cli
           - 실행한 웹앱 ZIP 검증 명령: python .\tools\verify_streamlit_portable_package.py --dist .\dist --smoke
+          - 실행한 통합 ZIP 검증 명령: python .\tools\verify_combined_release_package.py --dist .\dist --smoke
 
           ## 첨부파일
-          - Windows GUI/CLI 산출물 파일명: $assetName
-          - Windows GUI/CLI SHA256 파일명: $assetName.sha256
-          - Windows GUI/CLI SHA256 체크섬: $checksum
-          - Streamlit 웹앱 산출물 파일명: $webAssetName
-          - Streamlit 웹앱 SHA256 파일명: $webAssetName.sha256
-          - Streamlit 웹앱 SHA256 체크섬: $webChecksum
-          - GUI 사용 방법: Windows PC에서 ZIP 압축을 풀고 `WlcRoleAclCollectorGUI.exe`를 실행하세요.
-          - 웹앱 사용 방법: Streamlit portable ZIP 압축을 풀고 `start_webapp.cmd`를 더블클릭하세요. Python 별도 설치는 필요 없습니다.
+          - 다운로드할 파일: $assetName
+          - SHA256 체크섬: $checksum
+          - GUI 사용 방법: ZIP 압축을 풀고 `gui\WlcRoleAclCollectorGUI.exe`를 실행하세요.
+          - 웹앱 사용 방법: ZIP 압축을 풀고 `web\start_webapp.cmd`를 더블클릭하세요. Python 별도 설치는 필요 없습니다.
+          - 주의: GitHub 화면의 `Source code (zip)` / `Source code (tar.gz)`는 자동 생성된 소스 아카이브이며 일반 사용자가 실행할 파일이 아닙니다.
 
           <details>
           <summary>세부 커밋 및 변경 파일</summary>
@@ -297,9 +273,6 @@ jobs:
         run: |
           gh release create "${{ steps.metadata.outputs.tag }}" `
             "${{ steps.assets.outputs.asset_path }}#${{ steps.metadata.outputs.asset_name }}" `
-            "${{ steps.assets.outputs.checksum_path }}#${{ steps.assets.outputs.checksum_name }}" `
-            "${{ steps.assets.outputs.web_asset_path }}#${{ steps.metadata.outputs.web_asset_name }}" `
-            "${{ steps.assets.outputs.web_checksum_path }}#${{ steps.assets.outputs.web_checksum_name }}" `
             --repo "${{ github.repository }}" `
             --target "${{ github.sha }}" `
             --title "${{ steps.metadata.outputs.project_name }} ${{ steps.metadata.outputs.tag }}" `

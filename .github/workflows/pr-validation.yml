@@ -47,3 +47,11 @@ jobs:
       - name: Verify Streamlit portable package
         shell: pwsh
         run: python .\tools\verify_streamlit_portable_package.py --dist .\dist --smoke
+
+      - name: Build combined Windows package
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\build_windows_combined_release.ps1
+
+      - name: Verify combined Windows package
+        shell: pwsh
+        run: python .\tools\verify_combined_release_package.py --dist .\dist --smoke

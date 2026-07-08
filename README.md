@@ -35,15 +35,29 @@ Aruba AOS8 WLC에 접속해 SSID별 기본 Role과 Role별 ACL 접근 범위를 
 
 사내망 내부에서 공용 PC 또는 노트북 1대에 실행해 두고, 다른 사용자가 브라우저로 접속하는 방식입니다. 인터넷 공개용으로 설계하지 않았습니다.
 
-### 1. Release portable ZIP로 실행
+### 1. Release 통합 ZIP로 실행
 
-일반 사용자는 GitHub Release의 Streamlit portable ZIP을 사용합니다. 이 방식은 Windows PC에 Python을 별도로 설치하지 않습니다.
+일반 사용자는 GitHub Release의 Windows 통합 ZIP을 사용합니다. 이 방식은 Windows PC에 Python을 별도로 설치하지 않습니다.
 
-1. GitHub Releases에서 아래 두 파일을 다운로드합니다.
-   - `wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_streamlit_windows_portable.zip`
-   - `wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_streamlit_windows_portable.zip.sha256`
+1. GitHub Releases에서 아래 파일 하나만 다운로드합니다.
+   - `wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_windows.zip`
 2. Windows PC에서 ZIP 압축을 풉니다.
-3. 압축을 푼 폴더에서 `start_webapp.cmd`를 더블클릭합니다.
+3. `web` 폴더로 이동합니다.
+4. `start_webapp.cmd`를 더블클릭합니다.
+5. 실행 창은 닫지 않습니다. 이 창을 닫으면 웹앱도 종료됩니다.
+
+GitHub 화면의 `Source code (zip)` / `Source code (tar.gz)`는 자동 생성된 소스 코드 파일입니다. 일반 사용자가 실행할 파일이 아니므로 다운로드하지 않아도 됩니다.
+
+통합 ZIP 안의 웹앱 관련 파일은 아래 위치에 있습니다.
+
+- `web\start_webapp.cmd`
+- `web\webapp_settings.cmd`
+- `web\README_WEBAPP_KO.txt`
+- `web\python\`
+- `web\app\app.py`
+- `web\config\role_networks.example.xlsx`
+
+통합 ZIP 최상위의 `README_START_HERE_KO.txt`도 함께 확인하세요.
 4. 실행 창은 닫지 않습니다. 이 창을 닫으면 웹앱도 종료됩니다.
 
 ZIP 안에는 아래 파일과 폴더가 포함됩니다.
@@ -69,7 +83,7 @@ http://127.0.0.1:8763
 http://공용PC_IP:8763
 ```
 
-기본 포트는 `8763`입니다. 포트를 바꾸려면 압축을 푼 폴더의 `webapp_settings.cmd`를 메모장으로 열고 `WLC_WEB_PORT` 값을 변경합니다.
+기본 포트는 `8763`입니다. 포트를 바꾸려면 압축을 푼 폴더의 `web\webapp_settings.cmd`를 메모장으로 열고 `WLC_WEB_PORT` 값을 변경합니다.
 
 Windows 방화벽에서 TCP `8763` 포트 허용이 필요할 수 있습니다. 공용 PC가 꺼지거나 절전모드에 들어가면 접속이 끊기므로, 장시간 사용 시 전원/절전 설정을 확인하세요.
 
@@ -121,26 +135,35 @@ streamlit run app.py --server.address 0.0.0.0 --server.port 8763
 
 GitHub Release에서 Windows 배포 파일을 받는 방식이 일반 사용자용 경로입니다.
 
-1. GitHub Releases에서 아래 두 파일을 다운로드합니다.
+1. GitHub Releases에서 아래 파일 하나만 다운로드합니다.
    - `wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_windows.zip`
-   - `wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_windows.zip.sha256`
 2. Windows PC에서 ZIP 압축을 풉니다.
-3. 압축을 푼 폴더에서 `WlcRoleAclCollectorGUI.exe`를 실행합니다.
-4. CLI가 필요하면 같은 폴더의 `WlcRoleAclCollectorCLI.exe`를 사용합니다.
+3. `gui` 폴더로 이동합니다.
+4. `WlcRoleAclCollectorGUI.exe`를 실행합니다.
+5. CLI가 필요하면 같은 폴더의 `WlcRoleAclCollectorCLI.exe`를 사용합니다.
 
-Release ZIP 안에는 아래 파일이 포함됩니다.
+GitHub 화면의 `Source code (zip)` / `Source code (tar.gz)`는 자동 생성된 소스 코드 파일입니다. 일반 사용자가 실행할 파일이 아니므로 다운로드하지 않아도 됩니다.
 
-- `WlcRoleAclCollectorGUI.exe`
-- `WlcRoleAclCollectorCLI.exe`
-- `USER_GUIDE_KO.md`, `USER_GUIDE_KO.html`
-- `DEVELOPER_GUIDE_KO.md`, `DEVELOPER_GUIDE_KO.html`
-- `ERROR_CODES_KO.md`, `ERROR_CODES_KO.html`
-- `DIAGNOSTIC_MODE_KO.md`, `DIAGNOSTIC_MODE_KO.html`
-- `SECURITY_MODEL_KO.md`, `SECURITY_MODEL_KO.html`
-- `config\role_networks.example.xlsx`
-- `config\mock_scenarios\*.json`
+통합 Release ZIP 안에는 아래 파일이 포함됩니다.
 
-ZIP 파일과 `.sha256` 파일은 배포용 산출물입니다. 저장소에 커밋하지 않습니다.
+- `README_START_HERE_KO.txt`
+- `gui\WlcRoleAclCollectorGUI.exe`
+- `gui\WlcRoleAclCollectorCLI.exe`
+- `gui\USER_GUIDE_KO.md`, `gui\USER_GUIDE_KO.html`
+- `gui\DEVELOPER_GUIDE_KO.md`, `gui\DEVELOPER_GUIDE_KO.html`
+- `gui\ERROR_CODES_KO.md`, `gui\ERROR_CODES_KO.html`
+- `gui\DIAGNOSTIC_MODE_KO.md`, `gui\DIAGNOSTIC_MODE_KO.html`
+- `gui\SECURITY_MODEL_KO.md`, `gui\SECURITY_MODEL_KO.html`
+- `gui\config\role_networks.example.xlsx`
+- `gui\config\mock_scenarios\*.json`
+- `web\start_webapp.cmd`
+- `web\webapp_settings.cmd`
+- `web\README_WEBAPP_KO.txt`
+- `web\python\`
+- `web\app\app.py`
+- `web\config\role_networks.example.xlsx`
+
+ZIP 파일은 배포용 산출물입니다. 저장소에는 커밋하지 않습니다. SHA256 checksum은 별도 파일로 업로드하지 않고 GitHub Release 본문에 기록합니다.
 
 ### Python 소스에서 실행
 
@@ -193,7 +216,7 @@ ACL에 `alias <이름>`이 있으면 자동으로 `show netdestination <이름>`
 
 ## Windows 배포 패키지 만들기
 
-Python이 없는 사용자에게 배포할 때 Windows GUI/CLI EXE ZIP과 Streamlit portable ZIP을 생성합니다.
+Python이 없는 사용자에게 배포할 때 Windows GUI/CLI EXE ZIP과 Streamlit portable ZIP을 내부 산출물로 만든 뒤, 최종 사용자용 통합 ZIP 하나로 묶습니다.
 
 이 작업은 Windows PC 또는 GitHub Actions의 `windows-latest` runner에서 검증합니다. macOS 개발 PC에서는 소스 코드 수정, 테스트, 문서 검증을 수행하고, Windows 실행/portable 패키지 최종 검증은 GitHub Actions 또는 Windows PC에서 확인합니다.
 
@@ -201,6 +224,7 @@ Python이 없는 사용자에게 배포할 때 Windows GUI/CLI EXE ZIP과 Stream
 cd "D:\Codex Project\Network\wlc_role_acl_collector"
 .\build_windows_gui_exe.ps1
 .\build_windows_streamlit_portable.ps1
+.\build_windows_combined_release.ps1
 ```
 
 결과:
@@ -209,14 +233,12 @@ cd "D:\Codex Project\Network\wlc_role_acl_collector"
 - `dist\WlcRoleAclCollectorCLI.exe`
 - `dist\WlcRoleAclCollectorGUI_v0.1.0.zip`
 - `dist\WlcRoleAclCollectorWeb_v0.1.0.zip`
+- `dist\WlcRoleAclCollectorWindows_v0.1.0.zip`
 
-로컬 빌드 ZIP에는 GUI/CLI exe, 한국어 문서, `config\role_networks.example.xlsx`, `config\mock_scenarios`가 포함됩니다. GitHub Release에서는 이 ZIP을 아래 이름으로 복사하고 SHA256 파일을 함께 업로드합니다.
+GitHub Release에는 최종 통합 ZIP 하나만 아래 이름으로 업로드합니다. SHA256 checksum은 Release notes에 기록합니다.
 
 ```text
 wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_windows.zip
-wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_windows.zip.sha256
-wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_streamlit_windows_portable.zip
-wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_streamlit_windows_portable.zip.sha256
 ```
 
 배포 ZIP 구조와 checksum은 다음 스크립트로 검증합니다.
@@ -224,6 +246,7 @@ wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_streamlit_windows_portable.zip.sha256
 ```powershell
 python .\tools\verify_release_package.py --dist .\dist --smoke-cli
 python .\tools\verify_streamlit_portable_package.py --dist .\dist --smoke
+python .\tools\verify_combined_release_package.py --dist .\dist --smoke
 ```
 
 `--smoke-cli`는 Windows에서 ZIP을 풀고 `WlcRoleAclCollectorCLI.exe --help`를 실행합니다. Windows가 아닌 환경에서는 CLI smoke 실행을 건너뛰고 ZIP 구조 검증만 수행합니다.
@@ -231,11 +254,12 @@ python .\tools\verify_streamlit_portable_package.py --dist .\dist --smoke
 
 ## GitHub Release 자동 배포
 
-- PR 단계: `pull_request` to `main`에서 테스트, Windows GUI/CLI ZIP 빌드, Streamlit portable ZIP 빌드, ZIP 구조 검증을 수행합니다. Release는 만들지 않습니다.
-- main push 단계: `push` to `main`에서 테스트, 두 ZIP 빌드/검증, SHA256 생성, KST 기준 tag 생성, 공개 GitHub Release 생성을 수행합니다.
+- PR 단계: `pull_request` to `main`에서 테스트, Windows GUI/CLI ZIP 빌드, Streamlit portable ZIP 빌드, 통합 ZIP 빌드, ZIP 구조 검증을 수행합니다. Release는 만들지 않습니다.
+- main push 단계: `push` to `main`에서 테스트, 통합 ZIP 빌드/검증, SHA256 계산, KST 기준 tag 생성, 공개 GitHub Release 생성을 수행합니다.
 - 자동 tag 형식은 `vYYYY.MM.DD-HHMMSS`입니다. 같은 초에 tag가 이미 있으면 suffix를 붙입니다.
 - Release title은 `wlc-role-acl-collector <tag>` 형식입니다.
 - Release notes는 GitHub Actions에서 한국어로 생성되며 변경 커밋, 기준 SHA, 브랜치명, 검증 명령, 빌드 명령, 산출물 파일명, SHA256 checksum을 포함합니다.
+- Release asset으로 직접 업로드되는 파일은 `wlc-role-acl-collector_vYYYY.MM.DD-HHMMSS_windows.zip` 하나입니다. GitHub가 자동으로 보여주는 `Source code` 항목은 실행용 파일이 아닙니다.
 
 Release 준비 전에 `README.md`, `RELEASE_NOTES.md`, `CHANGELOG.md`를 함께 확인합니다. 실제 코드에 없는 기능, 내부 IP, 장비명, 계정, 비밀번호, 실제 로그, 고객 정보는 문서에 넣지 않습니다.
 
@@ -336,6 +360,7 @@ Streamlit 전환 관련 로컬 검증은 실제 WLC 접속 없이 fixture/offlin
 python -m pytest tests\test_web_logic.py tests\test_tooling.py -q
 python -m compileall -q app.py src tests tools
 python .\tools\verify_streamlit_portable_package.py --dist .\dist
+python .\tools\verify_combined_release_package.py --dist .\dist
 ```
 
 브라우저 수동 확인 절차:

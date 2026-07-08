@@ -65,6 +65,9 @@ def test_streamlit_portable_build_contract():
     assert '"--target", $sitePackages, ".[web]"' in build_script
     assert "WlcRoleAclCollectorWeb_v${version}.zip" in build_script
     assert "start_webapp.cmd --smoke" in build_script
+    assert "python.exe" in build_script
+    assert "compileall" in build_script
+    assert "Portable module precompile failed." in build_script
     assert "app\\app.py" in build_script
     assert "config\\role_networks.example.xlsx" in build_script
     assert "Lib\\site-packages" in build_script
@@ -81,12 +84,18 @@ def test_streamlit_portable_build_contract():
     assert "--server.address" in launcher
     assert "--server.port" in launcher
     assert "--server.headless true" in launcher
+    assert "--server.fileWatcherType none" in launcher
+    assert "--server.runOnSave false" in launcher
+    assert "--global.developmentMode false" in launcher
+    assert "--client.toolbarMode minimal" in launcher
+    assert "--browser.gatherUsageStats false" in launcher
     assert "--smoke" in launcher
     assert "STREAMLIT_PORTABLE_OK" in launcher
     assert "python\\python.exe" in launcher
     assert "WLC_WEB_ADDRESS=0.0.0.0" in settings
     assert "WLC_WEB_PORT=8763" in settings
     assert "Python을 별도로 설치하지 않고" in guide
+    assert "첫 실행" in guide
     assert "start_webapp.cmd" in guide
 
 

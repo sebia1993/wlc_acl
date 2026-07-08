@@ -30,6 +30,9 @@ CLI가 필요한 경우 gui\WlcRoleAclCollectorCLI.exe 를 사용합니다.
 
 웹앱은 ZIP 안에 포함된 내장 Python으로 실행됩니다.
 Windows PC에 Python을 별도로 설치할 필요가 없습니다.
+웹앱 첫 실행은 내장 Python과 Streamlit 초기화 때문에 GUI보다 느릴 수 있습니다.
+반드시 ZIP 압축을 완전히 푼 뒤 로컬 폴더에서 실행하세요.
+같은 PC에서 접속할 때는 http://127.0.0.1:8763 주소를 사용하면 됩니다.
 
 3. 웹앱 포트 변경
 ----------------

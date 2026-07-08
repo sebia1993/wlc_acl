@@ -147,6 +147,26 @@ Copy-Item -LiteralPath (Join-Path $templateDir "start_webapp.cmd") -Destination 
 Copy-Item -LiteralPath (Join-Path $templateDir "webapp_settings.cmd") -Destination (Join-Path $releaseRoot "webapp_settings.cmd") -Force
 Copy-Item -LiteralPath (Join-Path $templateDir "README_WEBAPP_KO.txt") -Destination (Join-Path $releaseRoot "README_WEBAPP_KO.txt") -Force
 
+Write-Host "Precompiling portable web app modules..."
+$portablePython = Join-Path $pythonDir "python.exe"
+$precompileTargets = @(
+    (Join-Path $releaseRoot "app"),
+    (Join-Path $sitePackages "wlc_role_acl_collector"),
+    (Join-Path $sitePackages "streamlit"),
+    (Join-Path $sitePackages "pandas"),
+    (Join-Path $sitePackages "openpyxl"),
+    (Join-Path $sitePackages "netmiko"),
+    (Join-Path $sitePackages "paramiko")
+) | Where-Object { Test-Path $_ }
+
+if ($precompileTargets.Count -gt 0) {
+    $compileArgs = @("-m", "compileall", "-q") + @($precompileTargets)
+    Invoke-External `
+        -FilePath $portablePython `
+        -Arguments $compileArgs `
+        -ErrorMessage "Portable module precompile failed."
+}
+
 Write-Host "Running portable web app smoke test..."
 Push-Location $releaseRoot
 try {

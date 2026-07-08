@@ -27,6 +27,7 @@ if /I "%~1"=="--smoke" (
 
 echo [INFO] WLC Role ACL Collector Streamlit 웹앱을 시작합니다.
 echo [INFO] 이 창을 닫으면 웹앱도 종료됩니다.
+echo [INFO] 첫 실행은 내장 Python과 Streamlit 초기화 때문에 잠시 느릴 수 있습니다.
 echo [INFO] 로컬 접속 주소: http://127.0.0.1:%WLC_WEB_PORT%
 echo [INFO] 다른 PC 접속 주소 예시: http://공용PC_IP:%WLC_WEB_PORT%
 echo.
@@ -35,6 +36,10 @@ echo.
     --server.address "%WLC_WEB_ADDRESS%" ^
     --server.port "%WLC_WEB_PORT%" ^
     --server.headless true ^
+    --server.fileWatcherType none ^
+    --server.runOnSave false ^
+    --global.developmentMode false ^
+    --client.toolbarMode minimal ^
     --browser.gatherUsageStats false
 
 set "EXIT_CODE=%ERRORLEVEL%"

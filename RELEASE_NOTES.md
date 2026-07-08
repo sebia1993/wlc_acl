@@ -60,6 +60,8 @@ ZIP 파일은 Release asset입니다. 저장소에는 커밋하지 않습니다.
 
 Streamlit 웹앱은 Windows 통합 ZIP의 `web` 폴더에 포함합니다. 일반 사용자는 Python을 설치하지 않고 `web/start_webapp.cmd`를 더블클릭합니다.
 
+웹앱 첫 실행은 내장 Python과 Streamlit 초기화 때문에 GUI EXE보다 느릴 수 있습니다. 배포 launcher는 파일 감시와 개발 모드를 끄고, portable 빌드 단계에서 주요 모듈을 사전 컴파일해 초기 접속 지연을 줄입니다. 사용자는 ZIP을 완전히 압축 해제한 뒤 로컬 폴더에서 실행해야 합니다.
+
 - `app.py`
 - `requirements.txt`
 - `src/wlc_role_acl_collector/web_logic.py`

@@ -26,6 +26,7 @@
 - Streamlit 업로드 파일과 결과 파일은 서버 임시 작업 폴더에서 처리하고 다운로드 bytes만 세션에 보관합니다.
 - Streamlit portable ZIP 검증에서 내장 Python, Streamlit 패키지, 앱 패키지, `start_webapp.cmd --smoke`, SHA256 sidecar를 확인합니다.
 - 통합 Release ZIP 검증에서 `gui`와 `web` 실행 경로, 필수 문서/config, CLI smoke, 웹앱 smoke를 확인합니다.
+- Streamlit portable launcher에서 파일 감시/개발 모드를 비활성화하고, 빌드 시 주요 웹앱 모듈을 사전 컴파일해 첫 실행/접속 체감 지연을 줄였습니다.
 - collect, diagnose, GUI 수집 결과 폴더가 같은 시간에 생성되어도 충돌하지 않도록 run directory 생성 방식을 개선했습니다.
 - `enable password` 적용 실패를 조용히 무시하지 않고 수집 결과와 진행 이벤트에 기록합니다.
 - Windows 배포 ZIP 검증에서 GUI/CLI exe, 문서, config, mock scenario, CLI `--help`, SHA256 sidecar를 확인합니다.

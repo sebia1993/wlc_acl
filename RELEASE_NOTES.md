@@ -96,6 +96,8 @@ python .\tools\verify_streamlit_portable_package.py --dist .\dist --smoke
 python .\tools\verify_combined_release_package.py --dist .\dist --smoke
 ```
 
+`tools\validate.ps1`은 HTML Access Check JavaScript와 Role PNG JavaScript를 각각 추출해 Node.js 문법 검사를 수행합니다. Role PNG 기능은 오프라인으로 포함된 `html2canvas` 리소스와 라이선스 파일이 패키지에 들어가는지도 테스트합니다.
+
 로컬 macOS에서 PowerShell 또는 Windows EXE 검증을 실행할 수 없으면 GitHub Actions `windows-latest` 결과를 기준으로 확인합니다.
 
 ## 작성하지 않을 내용

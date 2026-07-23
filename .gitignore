@@ -14,6 +14,7 @@ dist/
 # PyInstaller artifacts
 .pyinstaller_build/
 .streamlit_portable_build/
+.combined_release_build/
 
 # Generated and sensitive local artifacts
 outputs/

@@ -7,7 +7,9 @@ from wlc_role_acl_collector.collector import collect_from_offline_raw
 from wlc_role_acl_collector.models import Controller, RoleNetworkDefinition
 from wlc_role_acl_collector.report import (
     _acl_rows_html,
+    _html2canvas_source,
     _is_role_related_acl,
+    _role_image_export_script,
     _write_html,
     build_parsed_controllers,
     create_run_dir,
@@ -131,6 +133,25 @@ def test_write_excel_and_html_report(tmp_path):
     assert "beforeprint" in html
     assert "@media print" in html
     assert 'class="report-actions no-print"' in html
+    assert 'id="save-role-png"' in html
+    assert "선택 Role PNG 저장" in html
+    assert 'id="role-image-status"' in html
+    assert 'class="role-report-description"' in html
+    assert 'class="role-description-input"' in html
+    assert 'id="role-descriptions-data"' in html
+    assert "wlc-role-report-descriptions:" in html
+    assert "collectRoleDescriptions()" in html
+    assert "syncRoleDescriptionDomValues()" in html
+    assert "입력된 설명이 없습니다." in html
+    assert "ROLE_IMAGE_MAX_SINGLE_HEIGHT = 12000" in html
+    assert "ROLE_IMAGE_PAGE_HEIGHT = 5000" in html
+    assert "prepareRoleImageClone" in html
+    assert "pruneHiddenRoleRows" in html
+    assert "_part_${part}_of_${total}.png" in html
+    assert "typeof html2canvas !== 'function'" in html
+    assert len(_html2canvas_source()) > 190_000
+    assert "html2canvas" in html
+    assert "<script src=" not in html
     assert 'id="toggle-raw"' in html
     assert 'aria-pressed="false">Raw 보기</button>' in html
     assert "Raw 숨김" in html
@@ -193,6 +214,22 @@ def test_write_excel_and_html_report(tmp_path):
     assert "[show user-table output redacted]" in raw_text
     assert "corp-user-2" not in raw_text
     assert "aa:bb:cc" not in raw_text
+
+
+def test_role_image_export_script_preserves_visible_state_and_splits_safely():
+    script = _role_image_export_script()
+
+    assert "panel.cloneNode(true)" in script
+    assert "row.hidden || style.display === 'none'" in script
+    assert "comment-export-text" in script
+    assert "role-description-export-text" in script
+    assert "ROLE_IMAGE_SCALE = 2" in script
+    assert "ROLE_IMAGE_MIN_WIDTH = 1200" in script
+    assert "ROLE_IMAGE_MAX_WIDTH = 1800" in script
+    assert "assignRoleImageGroups" in script
+    assert "roleImageChunks" in script
+    assert "downloadRoleCanvas" in script
+    assert "roleImageButton.addEventListener('click', saveSelectedRolePng)" in script
 
 
 def test_write_report_does_not_export_local_role_network_mapping_by_default(tmp_path):

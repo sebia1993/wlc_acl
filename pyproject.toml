@@ -30,3 +30,9 @@ wlc-role-acl-gui = "wlc_role_acl_collector.gui_app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+wlc_role_acl_collector = [
+  "static/*.js",
+  "static/*.txt",
+]

@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from functools import lru_cache
 from html import escape
+from importlib.resources import files as resource_files
 from pathlib import Path
 from typing import Any
 
@@ -617,6 +619,8 @@ def _write_html(
     )
     access_check_css = _access_check_css()
     access_check_script = _access_check_script(history_enabled=access_history_enabled)
+    role_image_export_script = _role_image_export_script()
+    html2canvas_source = _html2canvas_source()
     role_buttons = "\n".join(
         f"""
         <button class="role-tab{_zero_user_role_class(bool(item['zero_user_hidden']))}" type="button" role="tab" data-role="{escape(str(item['role']))}" data-panel-id="{escape(str(item['panel_id']))}"
@@ -634,6 +638,7 @@ def _write_html(
             <h3>{escape(str(item['role']))}</h3>
             <span>{len(item['rows'])} rules / {item['user_count']} observed users{_other_acl_meta_text(int(item['other_acl_count']))}</span>
           </div>
+          {_role_description_html(str(item['role']))}
           {_local_role_network_html(local_network_lookup.get(str(item['role']), []), local_role_networks_enabled)}
           {_other_acl_toggle_html(str(item['panel_id']), int(item['other_acl_count']))}
           <table>
@@ -861,11 +866,25 @@ def _write_html(
       box-shadow: 0 6px 14px rgba(15, 108, 189, 0.22);
       transform: translateY(-1px);
     }}
+    .report-action:disabled {{
+      box-shadow: none;
+      cursor: wait;
+      opacity: .65;
+      transform: none;
+    }}
     .report-action.secondary {{ background: #e8eef6; color: #15324b; }}
     .report-action.secondary:hover {{
       background: #dce6f2;
       box-shadow: 0 6px 14px rgba(21, 50, 75, 0.10);
     }}
+    .role-image-status {{
+      align-self: center;
+      color: var(--muted);
+      font-size: 12px;
+      min-height: 18px;
+    }}
+    .role-image-status[data-state="success"] {{ color: var(--success); }}
+    .role-image-status[data-state="error"] {{ color: var(--danger); }}
     .role-tabs {{
       display: flex;
       flex-wrap: wrap;
@@ -927,6 +946,49 @@ def _write_html(
       font-size: 12px;
       margin: 6px 0 10px;
       padding: 8px 10px;
+    }}
+    .role-report-description {{
+      background: #f8fbff;
+      border-top: 1px solid var(--line);
+      padding: 12px 14px;
+    }}
+    .role-description-header {{
+      align-items: center;
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      margin-bottom: 7px;
+    }}
+    .role-description-header label {{
+      color: #15324b;
+      font-size: 13px;
+      font-weight: 700;
+    }}
+    .role-description-input {{
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 13px;
+      min-height: 88px;
+      padding: 9px 10px;
+      resize: vertical;
+      width: 100%;
+    }}
+    .role-description-status {{
+      color: var(--muted);
+      font-size: 11px;
+    }}
+    .role-description-status[data-state="saved"],
+    .role-description-status[data-state="restored"] {{
+      color: #05603a;
+    }}
+    .role-description-status[data-state="unavailable"] {{
+      color: #b42318;
+    }}
+    .role-description-print {{
+      display: none;
+      min-height: 22px;
+      white-space: pre-wrap;
     }}
     .local-network {{
       background: var(--panel-subtle);
@@ -1086,6 +1148,35 @@ def _write_html(
     }}
     .acl-section-header h3 {{ font-size: 16px; margin: 0; }}
     .acl-section-header span {{ color: var(--muted); font-size: 12px; }}
+    .role-image-export {{
+      box-shadow: none;
+      margin: 0;
+      max-width: none;
+      overflow: visible;
+    }}
+    .role-image-export .comment-export-text,
+    .role-image-export .role-description-export-text {{
+      min-height: 20px;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }}
+    .role-image-export .role-description-export-text {{
+      color: var(--text);
+      line-height: 1.55;
+    }}
+    .role-image-export .alias-link {{
+      background: transparent;
+      border: 0;
+      color: inherit;
+      cursor: default;
+      padding: 0;
+    }}
+    .role-image-export .image-export-part {{
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      margin-left: 8px;
+    }}
     .raw {{ font-family: Consolas, monospace; white-space: pre-wrap; }}
     .comment-cell {{ min-width: 220px; width: 24%; }}
     .comment-input {{
@@ -1134,6 +1225,10 @@ def _write_html(
         align-items: flex-start;
         flex-direction: column;
       }}
+      .role-description-header {{
+        align-items: flex-start;
+        flex-direction: column;
+      }}
       th, td {{
         padding: 8px;
       }}
@@ -1163,6 +1258,13 @@ def _write_html(
         white-space: pre-wrap;
       }}
       .comment-status {{ display: none; }}
+      .role-description-input {{ display: none; }}
+      .role-description-print {{
+        display: block;
+        min-height: 22px;
+        white-space: pre-wrap;
+      }}
+      .role-description-status {{ display: none; }}
     }}
   </style>
 </head>
@@ -1187,8 +1289,10 @@ def _write_html(
     <h2>Role ACL Detail</h2>
     <div class="report-actions no-print">
       <button id="save-commented-html" class="report-action" type="button">주석 포함 HTML 저장</button>
+      <button id="save-role-png" class="report-action" type="button">선택 Role PNG 저장</button>
       <button id="print-pdf" class="report-action secondary" type="button">PDF 저장/인쇄</button>
       <button id="toggle-raw" class="report-action secondary" type="button" aria-pressed="false">Raw 보기</button>
+      <span id="role-image-status" class="role-image-status" aria-live="polite"></span>
     </div>
     {zero_user_role_controls}
     <div class="role-tabs no-print" role="tablist" aria-label="Role ACL list">
@@ -1200,6 +1304,8 @@ def _write_html(
   <script id="access-check-data" type="application/json">{access_check_json}</script>
   {_access_check_history_data_html(access_history_enabled)}
   <textarea id="acl-comments-data" hidden>{{}}</textarea>
+  <textarea id="role-descriptions-data" hidden>{{}}</textarea>
+  <script>{html2canvas_source}</script>
   <script>
     const roleTabs = Array.from(document.querySelectorAll('.role-tab'));
     const rolePanels = Array.from(document.querySelectorAll('.role-panel'));
@@ -1208,6 +1314,7 @@ def _write_html(
     const otherAclToggles = Array.from(document.querySelectorAll('.toggle-other-acls'));
     let selectedRolePanelId = roleTabs.find((button) => button.getAttribute('aria-selected') === 'true' && !button.hidden)?.dataset.panelId || roleTabs.find((button) => !button.hidden)?.dataset.panelId || roleTabs[0]?.dataset.panelId || '';
     {access_check_script}
+    {role_image_export_script}
 
     function syncRawToggleButton() {{
       if (!rawToggleButton) {{
@@ -1340,7 +1447,10 @@ def _write_html(
     }}
     const commentsDataElement = document.querySelector('#acl-comments-data');
     const commentInputs = Array.from(document.querySelectorAll('.comment-input'));
+    const roleDescriptionsDataElement = document.querySelector('#role-descriptions-data');
+    const roleDescriptionInputs = Array.from(document.querySelectorAll('.role-description-input'));
     const commentStorageKey = `wlc-role-acl-comments:${{location.pathname || document.title}}`;
+    const roleDescriptionStorageKey = `wlc-role-report-descriptions:${{location.pathname || document.title}}`;
     const commentStorageAvailable = (() => {{
       try {{
         localStorage.setItem('wlc-role-acl-storage-test', '1');
@@ -1351,6 +1461,7 @@ def _write_html(
       }}
     }})();
     let aclComments = {{}};
+    let roleDescriptions = {{}};
 
     function readEmbeddedComments() {{
       try {{
@@ -1382,6 +1493,76 @@ def _write_html(
         return;
       }}
       localStorage.setItem(commentStorageKey, JSON.stringify(aclComments));
+    }}
+
+    function readEmbeddedRoleDescriptions() {{
+      try {{
+        return JSON.parse(
+          roleDescriptionsDataElement.value
+          || roleDescriptionsDataElement.textContent
+          || '{{}}'
+        );
+      }} catch (_error) {{
+        return {{}};
+      }}
+    }}
+
+    function syncRoleDescriptionsData() {{
+      const text = JSON.stringify(roleDescriptions, null, 2);
+      roleDescriptionsDataElement.value = text;
+      roleDescriptionsDataElement.textContent = text;
+    }}
+
+    function readStoredRoleDescriptions() {{
+      if (!commentStorageAvailable) {{
+        return {{}};
+      }}
+      try {{
+        return JSON.parse(localStorage.getItem(roleDescriptionStorageKey) || '{{}}');
+      }} catch (_error) {{
+        return {{}};
+      }}
+    }}
+
+    function persistRoleDescriptions() {{
+      if (!commentStorageAvailable) {{
+        return;
+      }}
+      localStorage.setItem(roleDescriptionStorageKey, JSON.stringify(roleDescriptions));
+    }}
+
+    function setRoleDescriptionStatus(input, text, state) {{
+      const status = document.getElementById(`${{input.dataset.descriptionId}}-status`);
+      if (!status) {{
+        return;
+      }}
+      status.textContent = text;
+      status.dataset.state = state || '';
+    }}
+
+    function updateRoleDescriptionPrint(input) {{
+      const printValue = document.getElementById(`${{input.dataset.descriptionId}}-print`);
+      if (printValue) {{
+        printValue.textContent = input.value || '입력된 설명이 없습니다.';
+      }}
+    }}
+
+    function collectRoleDescriptions() {{
+      roleDescriptions = {{}};
+      for (const input of roleDescriptionInputs) {{
+        if (input.value) {{
+          roleDescriptions[input.dataset.role] = input.value;
+        }}
+        updateRoleDescriptionPrint(input);
+      }}
+      syncRoleDescriptionsData();
+      persistRoleDescriptions();
+    }}
+
+    function syncRoleDescriptionDomValues() {{
+      for (const input of roleDescriptionInputs) {{
+        input.textContent = input.value;
+      }}
     }}
 
     function setCommentStatus(input, text, state) {{
@@ -1420,6 +1601,7 @@ def _write_html(
 
     function preparePrint() {{
       collectComments();
+      collectRoleDescriptions();
       for (const panel of rolePanels) {{
         panel.hidden = false;
       }}
@@ -1446,7 +1628,9 @@ def _write_html(
 
     function saveCommentedHtml() {{
       collectComments();
+      collectRoleDescriptions();
       syncTextareaDomValues();
+      syncRoleDescriptionDomValues();
       if (typeof syncAccessHistoryDomValues === 'function') {{
         syncAccessHistoryDomValues();
       }}
@@ -1484,6 +1668,28 @@ def _write_html(
     syncCommentsData();
     persistComments();
 
+    const embeddedRoleDescriptions = readEmbeddedRoleDescriptions();
+    const storedRoleDescriptions = readStoredRoleDescriptions();
+    const hasStoredRoleDescriptions = Object.keys(storedRoleDescriptions).length > 0;
+    roleDescriptions = Object.assign({{}}, embeddedRoleDescriptions, storedRoleDescriptions);
+    for (const input of roleDescriptionInputs) {{
+      input.value = roleDescriptions[input.dataset.role] || '';
+      updateRoleDescriptionPrint(input);
+      if (!commentStorageAvailable) {{
+        setRoleDescriptionStatus(input, '브라우저 자동 저장 불가', 'unavailable');
+      }} else if (hasStoredRoleDescriptions && input.value) {{
+        setRoleDescriptionStatus(input, '임시저장 복원됨', 'restored');
+      }} else {{
+        setRoleDescriptionStatus(input, '입력 시 자동 저장', '');
+      }}
+      input.addEventListener('input', () => {{
+        collectRoleDescriptions();
+        setRoleDescriptionStatus(input, '저장됨', 'saved');
+      }});
+    }}
+    syncRoleDescriptionsData();
+    persistRoleDescriptions();
+
     document.querySelector('#save-commented-html').addEventListener('click', saveCommentedHtml);
     document.querySelector('#print-pdf').addEventListener('click', () => {{
       preparePrint();
@@ -1496,6 +1702,311 @@ def _write_html(
 </html>
 """
     path.write_text(html, encoding="utf-8")
+
+
+@lru_cache(maxsize=1)
+def _html2canvas_source() -> str:
+    """Return the vendored browser renderer without requiring a network connection."""
+
+    try:
+        source = (
+            resource_files("wlc_role_acl_collector")
+            .joinpath("static")
+            .joinpath("html2canvas.min.js")
+            .read_text(encoding="utf-8")
+        )
+    except (FileNotFoundError, OSError):
+        # Report creation must still work if a packaging mistake omits the optional renderer.
+        # The generated page will show a clear PNG-export error instead of losing the report.
+        return ""
+    return source.replace("</script", r"<\/script")
+
+
+def _role_image_export_script() -> str:
+    """Build the standalone-browser logic for exporting the selected Role panel."""
+
+    return r"""
+    const roleImageButton = document.querySelector('#save-role-png');
+    const roleImageStatus = document.querySelector('#role-image-status');
+    const ROLE_IMAGE_SCALE = 2;
+    const ROLE_IMAGE_MIN_WIDTH = 1200;
+    const ROLE_IMAGE_MAX_WIDTH = 1800;
+    const ROLE_IMAGE_MAX_SINGLE_HEIGHT = 12000;
+    const ROLE_IMAGE_PAGE_HEIGHT = 5000;
+
+    function setRoleImageStatus(text, state = '') {
+      if (!roleImageStatus) {
+        return;
+      }
+      roleImageStatus.textContent = text;
+      roleImageStatus.dataset.state = state;
+    }
+
+    function roleImageFileName(roleName) {
+      const safeRole = String(roleName || 'role')
+        .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
+        .replace(/\s+/g, '_')
+        .replace(/[. ]+$/g, '')
+        .slice(0, 80) || 'role';
+      const now = new Date();
+      const pad = (value) => String(value).padStart(2, '0');
+      const stamp = [
+        now.getFullYear(),
+        pad(now.getMonth() + 1),
+        pad(now.getDate()),
+        '_',
+        pad(now.getHours()),
+        pad(now.getMinutes()),
+        pad(now.getSeconds()),
+      ].join('');
+      return `role_${safeRole}_${stamp}`;
+    }
+
+    function replaceExportTextarea(cloneInput, sourceInput, className, emptyText = '') {
+      const value = sourceInput?.value || emptyText;
+      const output = document.createElement('div');
+      output.className = className;
+      output.textContent = value;
+      cloneInput.replaceWith(output);
+    }
+
+    function prepareRoleImageClone(panel, exportWidth) {
+      const clone = panel.cloneNode(true);
+      clone.hidden = false;
+      clone.removeAttribute('id');
+      clone.classList.add('role-image-export');
+      clone.style.width = `${exportWidth}px`;
+      clone.style.maxWidth = 'none';
+
+      for (const control of clone.querySelectorAll(
+        '.acl-filter-actions, .role-description-status, .comment-status, '
+        + '.comment-print, .role-description-print'
+      )) {
+        control.remove();
+      }
+
+      for (const button of clone.querySelectorAll('.alias-link')) {
+        const text = document.createElement('span');
+        text.className = 'alias-link';
+        text.textContent = button.textContent || '';
+        button.replaceWith(text);
+      }
+
+      for (const input of clone.querySelectorAll('.comment-input')) {
+        const sourceInput = commentInputs.find(
+          (item) => item.dataset.commentId === input.dataset.commentId
+        );
+        replaceExportTextarea(input, sourceInput, 'comment-export-text');
+      }
+
+      for (const input of clone.querySelectorAll('.role-description-input')) {
+        const sourceInput = roleDescriptionInputs.find(
+          (item) => item.dataset.role === input.dataset.role
+        );
+        replaceExportTextarea(
+          input,
+          sourceInput,
+          'role-description-export-text',
+          '입력된 설명이 없습니다.'
+        );
+      }
+      return clone;
+    }
+
+    function mountRoleImageClone(clone, exportWidth) {
+      const host = document.createElement('div');
+      host.setAttribute('aria-hidden', 'true');
+      host.style.background = '#ffffff';
+      host.style.left = '0';
+      host.style.pointerEvents = 'none';
+      host.style.position = 'fixed';
+      host.style.top = '0';
+      host.style.width = `${exportWidth}px`;
+      host.style.zIndex = '-2147483647';
+      host.appendChild(clone);
+      document.body.appendChild(host);
+      return host;
+    }
+
+    function pruneHiddenRoleRows(clone) {
+      for (const row of clone.querySelectorAll('tbody > tr')) {
+        const style = getComputedStyle(row);
+        if (row.hidden || style.display === 'none' || style.visibility === 'hidden') {
+          row.remove();
+        }
+      }
+    }
+
+    function assignRoleImageGroups(clone) {
+      let groupIndex = -1;
+      for (const row of clone.querySelectorAll('tbody > tr')) {
+        if (row.classList.contains('acl-rule-row')) {
+          groupIndex += 1;
+        }
+        row.dataset.exportGroup = String(Math.max(groupIndex, 0));
+      }
+      return groupIndex + 1;
+    }
+
+    function roleImageChunks(clone, groupCount) {
+      if (groupCount <= 0) {
+        return [];
+      }
+      const tbody = clone.querySelector('tbody');
+      if (!tbody) {
+        return [];
+      }
+      const fullHeight = Math.ceil(clone.scrollHeight);
+      const bodyHeight = Math.ceil(tbody.getBoundingClientRect().height);
+      const availableHeight = Math.max(800, ROLE_IMAGE_PAGE_HEIGHT - (fullHeight - bodyHeight));
+      const groupHeights = new Array(groupCount).fill(0);
+      for (const row of tbody.querySelectorAll(':scope > tr')) {
+        const index = Number(row.dataset.exportGroup || 0);
+        groupHeights[index] += Math.ceil(row.getBoundingClientRect().height);
+      }
+
+      const chunks = [];
+      let current = [];
+      let currentHeight = 0;
+      groupHeights.forEach((height, index) => {
+        if (current.length && currentHeight + height > availableHeight) {
+          chunks.push(current);
+          current = [];
+          currentHeight = 0;
+        }
+        current.push(index);
+        currentHeight += height;
+      });
+      if (current.length) {
+        chunks.push(current);
+      }
+      return chunks;
+    }
+
+    function roleImagePageClone(baseClone, groupIndexes, partNumber, partCount) {
+      const page = baseClone.cloneNode(true);
+      const allowed = new Set(groupIndexes.map(String));
+      for (const row of page.querySelectorAll('tbody > tr')) {
+        if (!allowed.has(row.dataset.exportGroup || '0')) {
+          row.remove();
+        }
+      }
+      const meta = page.querySelector('.acl-section-header span');
+      if (meta) {
+        const marker = document.createElement('span');
+        marker.className = 'image-export-part';
+        marker.textContent = `이미지 ${partNumber}/${partCount}`;
+        meta.appendChild(marker);
+      }
+      return page;
+    }
+
+    async function renderRoleImage(clone, exportWidth) {
+      const width = Math.ceil(Math.min(ROLE_IMAGE_MAX_WIDTH, Math.max(exportWidth, clone.scrollWidth)));
+      const height = Math.ceil(clone.scrollHeight);
+      return html2canvas(clone, {
+        backgroundColor: '#ffffff',
+        height,
+        logging: false,
+        removeContainer: true,
+        scale: ROLE_IMAGE_SCALE,
+        useCORS: false,
+        width,
+        windowHeight: height,
+        windowWidth: width,
+      });
+    }
+
+    function downloadRoleCanvas(canvas, fileName) {
+      return new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            reject(new Error('PNG 데이터 생성에 실패했습니다.'));
+            return;
+          }
+          const link = document.createElement('a');
+          const url = URL.createObjectURL(blob);
+          link.href = url;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          resolve();
+        }, 'image/png');
+      });
+    }
+
+    async function saveSelectedRolePng() {
+      const panel = rolePanels.find((item) => item.id === selectedRolePanelId && !item.hidden);
+      if (!panel) {
+        setRoleImageStatus('저장할 Role을 먼저 선택하세요.', 'error');
+        return;
+      }
+      if (typeof html2canvas !== 'function') {
+        setRoleImageStatus('PNG 변환 모듈을 찾지 못했습니다. 프로그램을 다시 빌드하거나 업데이트하세요.', 'error');
+        return;
+      }
+
+      roleImageButton.disabled = true;
+      roleImageButton.textContent = 'PNG 생성 중...';
+      setRoleImageStatus('선택한 Role 이미지를 준비하고 있습니다.');
+      let measurementHost = null;
+      try {
+        collectComments();
+        collectRoleDescriptions();
+        const exportWidth = Math.ceil(Math.min(
+          ROLE_IMAGE_MAX_WIDTH,
+          Math.max(ROLE_IMAGE_MIN_WIDTH, panel.scrollWidth)
+        ));
+        const baseClone = prepareRoleImageClone(panel, exportWidth);
+        measurementHost = mountRoleImageClone(baseClone, exportWidth);
+        pruneHiddenRoleRows(baseClone);
+        const groupCount = assignRoleImageGroups(baseClone);
+        const baseName = roleImageFileName(panel.dataset.role || 'role');
+        const fullHeight = Math.ceil(baseClone.scrollHeight);
+
+        if (fullHeight <= ROLE_IMAGE_MAX_SINGLE_HEIGHT || groupCount <= 0) {
+          const canvas = await renderRoleImage(baseClone, exportWidth);
+          await downloadRoleCanvas(canvas, `${baseName}.png`);
+          setRoleImageStatus('선택한 Role PNG를 저장했습니다.', 'success');
+          return;
+        }
+
+        const chunks = roleImageChunks(baseClone, groupCount);
+        measurementHost.remove();
+        measurementHost = null;
+        for (let index = 0; index < chunks.length; index += 1) {
+          const page = roleImagePageClone(baseClone, chunks[index], index + 1, chunks.length);
+          const pageHost = mountRoleImageClone(page, exportWidth);
+          try {
+            const canvas = await renderRoleImage(page, exportWidth);
+            const part = String(index + 1).padStart(2, '0');
+            const total = String(chunks.length).padStart(2, '0');
+            await downloadRoleCanvas(canvas, `${baseName}_part_${part}_of_${total}.png`);
+          } finally {
+            pageHost.remove();
+          }
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        }
+        setRoleImageStatus(
+          `${chunks.length}개 PNG로 나누어 저장했습니다. 필요하면 브라우저에서 여러 파일 다운로드를 허용하세요.`,
+          'success'
+        );
+      } catch (error) {
+        setRoleImageStatus(`PNG 생성 실패: ${error?.message || error}`, 'error');
+      } finally {
+        measurementHost?.remove();
+        roleImageButton.disabled = false;
+        roleImageButton.textContent = '선택 Role PNG 저장';
+      }
+    }
+
+    if (roleImageButton) {
+      roleImageButton.disabled = rolePanels.length === 0;
+      roleImageButton.addEventListener('click', saveSelectedRolePng);
+    }
+    """
 
 
 def _json_for_html(data: dict[str, Any]) -> str:
@@ -2567,6 +3078,23 @@ def _zero_user_role_attrs(hidden: bool) -> str:
 
 def _hidden_attr(hidden: bool) -> str:
     return " hidden" if hidden else ""
+
+
+def _role_description_html(role: str) -> str:
+    description_id = f"role-description-{_safe_dom_id(role)}"
+    return f"""
+    <div class="role-report-description">
+      <div class="role-description-header">
+        <label for="{escape(description_id)}">보고용 설명</label>
+        <span id="{escape(description_id)}-status" class="role-description-status">입력 시 자동 저장</span>
+      </div>
+      <textarea id="{escape(description_id)}" class="role-description-input"
+        data-role="{escape(role)}" data-description-id="{escape(description_id)}"
+        aria-label="{escape(role)} Role 보고용 설명"
+        placeholder="상급자 보고용 Role 목적, 대상 사용자, 주요 접근 범위와 확인 사항을 입력하세요."></textarea>
+      <div id="{escape(description_id)}-print" class="role-description-print">입력된 설명이 없습니다.</div>
+    </div>
+    """
 
 
 def _local_role_network_html(rows: list[dict[str, Any]], enabled: bool) -> str:

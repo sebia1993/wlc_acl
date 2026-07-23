@@ -193,6 +193,7 @@ Excel과 HTML 보고서를 만드는 파일입니다. 이 프로젝트에서 가
 - Excel 시트 생성
 - HTML 문자열 생성
 - Role 탭, ACL 표, Alias 상세, Comment UI 생성
+- Role별 보고 설명 자동저장과 선택 Role PNG 생성
 - Access Check에 필요한 JSON 생성
 - Role 탭 선택과 Access Check Role 선택값 동기화
 - 보안모드에서 민감 데이터 export 차단
@@ -205,6 +206,23 @@ access_history_enabled=False
 ```
 
 CLI는 이 기본값을 유지하므로 Role network Excel을 선택해도 `--export-local-role-networks`를 명시하지 않으면 내부 대역이 저장되지 않습니다. GUI는 사내 Role 대역표를 선택한 실행을 내부용 보고서 생성으로 간주해 `export_local_role_networks=True`로 보고서를 만듭니다.
+
+#### Role 보고 설명과 PNG 내보내기
+
+Role 보고 설명은 `wlc-role-report-descriptions:<보고서 경로>` 키로 브라우저 `localStorage`에 저장합니다. `주석 포함 HTML 저장`을 실행할 때는 `role-descriptions-data`에 최신 값을 넣어 독립 HTML에도 포함합니다.
+
+PNG 변환은 인터넷이 없는 사내망에서도 동작해야 하므로 `src/wlc_role_acl_collector/static/html2canvas.min.js`를 패키지에 포함합니다. `_html2canvas_source()`는 패키지 리소스를 읽어 HTML 안에 삽입하며, 누락된 경우 보고서 생성 자체는 유지하고 버튼에서 명확한 오류를 표시합니다. 라이선스 원문은 같은 폴더의 `LICENSE.html2canvas.txt`에 보관합니다.
+
+`_role_image_export_script()`의 주요 동작:
+
+- 현재 선택된 Role panel만 복제
+- 화면에서 숨긴 Raw, 다른 ACL, Alias 상세 행 제거
+- ACL Comment와 Role 보고 설명 입력란을 고정 텍스트로 변환
+- Windows 파일명 금지 문자를 안전한 문자로 교체
+- 높이 `12000px` 이하는 PNG 한 장, 그보다 길면 ACL 그룹 기준 약 `5000px` 단위로 분할
+- 분할 파일명에 `_part_XX_of_YY` 추가
+
+PyInstaller 빌드는 `collect_data_files('wlc_role_acl_collector')`로 정적 JavaScript와 라이선스를 포함합니다. `pyproject.toml`의 package data 설정도 유지해야 wheel이나 editable 설치에서 리소스를 찾을 수 있습니다.
 
 ### `acl_evaluator.py`
 
@@ -336,6 +354,7 @@ mock 관련 파일:
 1. `pytest`
 2. `compileall`
 3. HTML Access Check JavaScript 문법 검사
+4. Role PNG JavaScript 문법 검사
 
 부분 테스트:
 

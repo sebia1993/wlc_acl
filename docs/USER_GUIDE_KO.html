@@ -252,14 +252,22 @@ python -m wlc_role_acl_collector.gui_app</code></pre>
       <li>Role 이름과 관련 없는 ACL은 기본 숨김 처리되며, 필요 시 <code>Show other ACLs</code>로 표시합니다.</li>
       <li>Raw 컬럼은 기본 숨김이며, 필요 시 <code>Raw 보기</code> 버튼으로 표시합니다.</li>
       <li>Source 또는 Destination에 <code>alias 이름</code>이 있으면 alias 버튼을 클릭해 상세 host, network, range를 확인합니다.</li>
+      <li>선택한 Role 상단의 <code>Role 보고 설명</code>에는 상급자 보고용 설명이나 검토 의견을 입력할 수 있습니다.</li>
+      <li><code>선택 Role PNG 저장</code>은 현재 선택한 Role 한 개를 이미지로 저장합니다.</li>
     </ul>
-    <h2>8. ACL 주석 기능</h2>
+    <h2>8. ACL 주석, Role 설명, 이미지 저장</h2>
     <p>ACL 행마다 Comment 입력란이 있습니다.</p>
     <ul>
       <li>입력한 주석은 브라우저에 임시 저장됩니다.</li>
-      <li><code>주석 포함 HTML 저장</code> 버튼을 누르면 현재 주석이 포함된 별도 HTML 파일을 저장할 수 있습니다.</li>
+      <li>Role별 <code>Role 보고 설명</code>도 입력 즉시 같은 브라우저에 자동 저장됩니다.</li>
+      <li><code>주석 포함 HTML 저장</code> 버튼을 누르면 현재 ACL 주석과 Role 설명이 포함된 별도 HTML 파일을 저장할 수 있습니다.</li>
+      <li><code>선택 Role PNG 저장</code>을 누르면 현재 선택한 Role 한 개만 PNG로 저장됩니다.</li>
+      <li>PNG에는 현재 화면에서 보이는 상태가 반영됩니다. <code>Raw 보기</code>, <code>Show other ACLs</code>, Alias 상세를 열거나 닫은 상태를 먼저 조정한 뒤 저장하십시오.</li>
+      <li>PNG에서는 입력란과 버튼 대신 ACL 주석과 Role 설명이 읽기 쉬운 고정 텍스트로 표시됩니다.</li>
+      <li>Role 내용이 매우 길면 파일명이 <code>_part_01_of_03.png</code> 같은 여러 PNG로 나뉩니다. 이때 브라우저에서 여러 파일 다운로드를 허용해야 할 수 있습니다.</li>
+      <li>생성된 PNG는 일반적으로 브라우저 기본 다운로드 폴더에 저장됩니다.</li>
       <li>PDF로 저장하려면 <code>PDF 저장/인쇄</code> 버튼을 누르고 브라우저 인쇄 화면에서 PDF 저장을 선택합니다.</li>
-      <li>PDF는 정적인 문서이므로 HTML처럼 클릭, 접기, 펼치기 기능은 유지되지 않습니다.</li>
+      <li>PDF는 전체 Role을 대상으로 하는 정적인 문서이므로 HTML처럼 클릭, 접기, 펼치기 기능은 유지되지 않습니다.</li>
     </ul>
     <h2>9. Access Check 사용 방법</h2>
     <p>HTML 보고서 하단의 Access Check 영역에서 특정 Role 기준 허용/차단 여부를 보조로 확인할 수 있습니다.</p>

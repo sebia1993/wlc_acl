@@ -267,6 +267,7 @@ show user-table</code></pre>
       <li>Excel 시트 생성</li>
       <li>HTML 문자열 생성</li>
       <li>Role 탭, ACL 표, Alias 상세, Comment UI 생성</li>
+      <li>Role별 보고 설명 자동저장과 선택 Role PNG 생성</li>
       <li>Access Check에 필요한 JSON 생성</li>
       <li>Role 탭 선택과 Access Check Role 선택값 동기화</li>
       <li>보안모드에서 민감 데이터 export 차단</li>
@@ -275,6 +276,19 @@ show user-table</code></pre>
     <pre><code>export_local_role_networks=False
 access_history_enabled=False</code></pre>
     <p>CLI는 이 기본값을 유지하므로 Role network Excel을 선택해도 <code>--export-local-role-networks</code>를 명시하지 않으면 내부 대역이 저장되지 않습니다. GUI는 사내 Role 대역표를 선택한 실행을 내부용 보고서 생성으로 간주해 <code>export_local_role_networks=True</code>로 보고서를 만듭니다.</p>
+    <p>#### Role 보고 설명과 PNG 내보내기</p>
+    <p>Role 보고 설명은 <code>wlc-role-report-descriptions:&lt;보고서 경로&gt;</code> 키로 브라우저 <code>localStorage</code>에 저장합니다. <code>주석 포함 HTML 저장</code>을 실행할 때는 <code>role-descriptions-data</code>에 최신 값을 넣어 독립 HTML에도 포함합니다.</p>
+    <p>PNG 변환은 인터넷이 없는 사내망에서도 동작해야 하므로 <code>src/wlc_role_acl_collector/static/html2canvas.min.js</code>를 패키지에 포함합니다. <code>_html2canvas_source()</code>는 패키지 리소스를 읽어 HTML 안에 삽입하며, 누락된 경우 보고서 생성 자체는 유지하고 버튼에서 명확한 오류를 표시합니다. 라이선스 원문은 같은 폴더의 <code>LICENSE.html2canvas.txt</code>에 보관합니다.</p>
+    <p><code>_role_image_export_script()</code>의 주요 동작:</p>
+    <ul>
+      <li>현재 선택된 Role panel만 복제</li>
+      <li>화면에서 숨긴 Raw, 다른 ACL, Alias 상세 행 제거</li>
+      <li>ACL Comment와 Role 보고 설명 입력란을 고정 텍스트로 변환</li>
+      <li>Windows 파일명 금지 문자를 안전한 문자로 교체</li>
+      <li>높이 <code>12000px</code> 이하는 PNG 한 장, 그보다 길면 ACL 그룹 기준 약 <code>5000px</code> 단위로 분할</li>
+      <li>분할 파일명에 <code>_part_XX_of_YY</code> 추가</li>
+    </ul>
+    <p>PyInstaller 빌드는 <code>collect_data_files(&#x27;wlc_role_acl_collector&#x27;)</code>로 정적 JavaScript와 라이선스를 포함합니다. <code>pyproject.toml</code>의 package data 설정도 유지해야 wheel이나 editable 설치에서 리소스를 찾을 수 있습니다.</p>
     <h3><code>acl_evaluator.py</code></h3>
     <p>HTML Access Check의 판단 로직을 준비하는 파일입니다.</p>
     <p>Access Check 대상 ACL:</p>
@@ -388,6 +402,7 @@ access_history_enabled=False</code></pre>
       <li><code>pytest</code></li>
       <li><code>compileall</code></li>
       <li>HTML Access Check JavaScript 문법 검사</li>
+      <li>Role PNG JavaScript 문법 검사</li>
     </ol>
     <p>부분 테스트:</p>
     <pre><code>python -m pytest tests\test_report.py

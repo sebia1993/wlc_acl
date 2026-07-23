@@ -12,7 +12,7 @@
 - Aruba AOS8 WLC에서 SSID, AAA Profile, 기본 Role, Role ACL, Alias 정보를 수집합니다.
 - `show ip interface brief`와 `show user-table`을 이용해 Role 대역 추정 근거와 현재 관측 사용자 정보를 보고서에 표시합니다.
 - Excel 보고서와 HTML 보고서를 생성합니다.
-- HTML 보고서에서 Role별 ACL 보기, 주석 임시 저장, 주석 포함 HTML 저장, PDF 저장/인쇄, Access Check를 제공합니다.
+- HTML 보고서에서 Role별 ACL 보기, ACL 주석/Role 설명 자동저장, 주석 포함 HTML 저장, 선택 Role PNG 저장, PDF 저장/인쇄, Access Check를 제공합니다.
 - GUI에서 사내 Role 대역 Excel 파일을 선택해 내부용 비교 보고서를 만들 수 있습니다.
 - CLI에서는 `--export-local-role-networks`를 명시한 경우에만 로컬 Role 대역을 보고서에 포함합니다.
 - 안전 진단 모드는 민감정보를 마스킹한 HTML/JSON 진단 보고서를 생성합니다.
@@ -22,6 +22,9 @@
 
 최근 안정성 개선:
 
+- 선택한 Role만 상급자 보고용 PNG로 저장하고, 긴 Role은 ACL 그룹을 유지한 여러 이미지로 자동 분할합니다.
+- PNG 변환 라이브러리와 라이선스를 패키지에 포함해 인터넷이 차단된 사내망에서도 이미지 저장이 동작합니다.
+- 전체 검증 스크립트가 Role PNG JavaScript 문법 오류와 중간 단계 실패를 정확히 감지합니다.
 - Streamlit 실행마다 날짜시간과 세션 구분값이 포함된 결과 파일명을 사용합니다.
 - Streamlit 업로드 파일과 결과 파일은 서버 임시 작업 폴더에서 처리하고 다운로드 bytes만 세션에 보관합니다.
 - Streamlit portable ZIP 검증에서 내장 Python, Streamlit 패키지, 앱 패키지, `start_webapp.cmd --smoke`, SHA256 sidecar를 확인합니다.

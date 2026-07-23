@@ -13,6 +13,7 @@ def test_validate_script_runs_local_checks():
     assert "python -m pytest -q" in text
     assert "python -m compileall -q app.py src tests tools" in text
     assert "node --check" in text
+    assert "_role_image_export_script" in text
     assert "Node.js was not found. Skipping JavaScript syntax check." in text
 
 
@@ -27,6 +28,7 @@ def test_release_zip_includes_guides():
     assert "WlcRoleAclCollectorCLI" in text
     assert "--collect-data customtkinter" in text
     assert "collect_data_files('customtkinter')" in spec_text
+    assert "collect_data_files('wlc_role_acl_collector')" in spec_text
     assert ".\\cli_launcher.py" in text
     assert "tools\\generate_doc_html.py" in text
     assert "docs\\USER_GUIDE_KO.md" in text
@@ -398,7 +400,15 @@ def test_github_actions_split_pr_validation_and_release():
 
 
 def test_runtime_dependencies_include_customtkinter():
-    pyproject = (Path(__file__).parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+    repo_root = Path(__file__).parents[1]
+    pyproject = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
+    renderer = repo_root / "src" / "wlc_role_acl_collector" / "static" / "html2canvas.min.js"
+    license_file = repo_root / "src" / "wlc_role_acl_collector" / "static" / "LICENSE.html2canvas.txt"
 
     assert '"customtkinter>=5.2"' in pyproject
     assert '"streamlit>=1.36"' in pyproject
+    assert "[tool.setuptools.package-data]" in pyproject
+    assert '"static/*.js"' in pyproject
+    assert '"static/*.txt"' in pyproject
+    assert renderer.stat().st_size > 190_000
+    assert "Permission is hereby granted, free of charge" in license_file.read_text(encoding="utf-8")

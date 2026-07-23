@@ -7,7 +7,7 @@ a = Analysis(
     ['gui_launcher.py'],
     pathex=['.\\src'],
     binaries=[],
-    datas=collect_data_files('customtkinter'),
+    datas=collect_data_files('customtkinter') + collect_data_files('wlc_role_acl_collector'),
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

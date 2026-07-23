@@ -33,8 +33,7 @@ try {
         $tempAccessScript = Join-Path ([System.IO.Path]::GetTempPath()) "wlc_access_check_script.js"
         $tempRoleImageScript = Join-Path ([System.IO.Path]::GetTempPath()) "wlc_role_image_export_script.js"
         try {
-            python -c "from wlc_role_acl_collector.report import _access_check_script; print(_access_check_script())" |
-                Set-Content -LiteralPath $tempAccessScript -Encoding UTF8
+            python -c "from pathlib import Path; import sys; from wlc_role_acl_collector.report import _access_check_script; Path(sys.argv[1]).write_text(_access_check_script(), encoding='utf-8')" $tempAccessScript
             if ($LASTEXITCODE -ne 0) {
                 throw "Access Check JavaScript extraction failed with exit code $LASTEXITCODE."
             }
@@ -44,8 +43,7 @@ try {
             }
 
             Write-Host "[4/4] Role PNG JavaScript syntax"
-            python -c "from wlc_role_acl_collector.report import _role_image_export_script; print(_role_image_export_script())" |
-                Set-Content -LiteralPath $tempRoleImageScript -Encoding UTF8
+            python -c "from pathlib import Path; import sys; from wlc_role_acl_collector.report import _role_image_export_script; Path(sys.argv[1]).write_text(_role_image_export_script(), encoding='utf-8')" $tempRoleImageScript
             if ($LASTEXITCODE -ne 0) {
                 throw "Role PNG JavaScript extraction failed with exit code $LASTEXITCODE."
             }

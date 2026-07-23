@@ -14,6 +14,8 @@ def test_validate_script_runs_local_checks():
     assert "python -m compileall -q app.py src tests tools" in text
     assert "node --check" in text
     assert "_role_image_export_script" in text
+    assert "Path(sys.argv[1]).write_text" in text
+    assert "Set-Content -LiteralPath $tempAccessScript" not in text
     assert "Node.js was not found. Skipping JavaScript syntax check." in text
 
 
